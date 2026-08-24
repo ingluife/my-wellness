@@ -1,0 +1,39 @@
+name: iOS · build
+
+# Keeps the iOS target compiling. Signed distribution stays a local Xcode step: Apple does not
+# allow installing outside the App Store, so there is no artifact here worth handing anyone —
+# the value is catching a break in the iOS build the day it happens rather than months later.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (unsigned)
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stub the exercise media
+        # The build only needs the asset directories to exist; it does not care what is in
+        # them, and pulling 137 MB to prove the Swift compiles is not a good trade.
+        run: |
+          mkdir -p assets/img assets/gif
+          touch assets/img/.keep assets/gif/.keep
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.38.9
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign
