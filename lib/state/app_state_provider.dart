@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/app_state.dart';
 import '../data/repositories/state_repository.dart';
 import '../domain/exercises.dart';
+import '../domain/foods.dart';
 import '../domain/format.dart';
 import '../domain/i18n.dart';
 import '../platform/reminders.dart';
@@ -31,6 +32,7 @@ class AppStateController extends Notifier<AppState> {
   Future<void> boot() async {
     final s = await _repo.boot();
     Exercises.instance.registerCustom(s.customEx);
+    Foods.instance.registerCustom(s.nutrition.foods);
     await I18n.instance.setLang(s.lang);
 
     // Re-stamp the reminder's timezone on every launch — keeps it correct if you are
@@ -60,6 +62,7 @@ class AppStateController extends Notifier<AppState> {
   void _persist(AppState next) {
     next.ts = DateTime.now().millisecondsSinceEpoch;
     Exercises.instance.registerCustom(next.customEx);
+    Foods.instance.registerCustom(next.nutrition.foods);
     final before = state;
     state = next;
     _repo.save(next);

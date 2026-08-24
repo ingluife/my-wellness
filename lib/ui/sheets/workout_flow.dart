@@ -9,6 +9,7 @@ import '../../domain/glyphs.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
 import '../../domain/muscles.dart';
+import '../../domain/nutrition.dart';
 import '../../domain/onerm.dart';
 import '../../domain/progression.dart';
 import '../../state/app_state_provider.dart';
@@ -367,7 +368,13 @@ class _FinishSummary extends ConsumerWidget {
           (label: t('Duration'), value: fmtDur(workout.end - workout.start), color: null),
           (label: t('Volume'), value: fmtVol(workout.vol, s.unit), color: null),
           (label: t('Sets'), value: '${setsDone(workout)}', color: null),
-          (label: t('PRs'), value: prs.isEmpty ? '—' : '${prs.length}', color: null),
+          // Burned, not PRs, when there is a body weight to work it out from — the estimate
+          // is never more meaningful than in the minute the session ends. PRs keep the slot
+          // otherwise, and they get their own lines below either way.
+          if (_burn(s) != null)
+            (label: t('Burned'), value: '${workoutBurn(workout, _burn(s)!).round()} ${t('kcal')}', color: null)
+          else
+            (label: t('PRs'), value: prs.isEmpty ? '—' : '${prs.length}', color: null),
         ]),
         if (prs.isNotEmpty || e1prs.isNotEmpty) ...[
           for (final id in prs)
@@ -391,6 +398,9 @@ class _FinishSummary extends ConsumerWidget {
     );
   }
 }
+
+/// Body weight in kg, or null when there has never been a weigh-in.
+double? _burn(AppState s) => bodyKg(s);
 
 class _PrLine extends StatelessWidget {
   const _PrLine({required this.icon, required this.text});

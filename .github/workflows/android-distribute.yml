@@ -49,6 +49,17 @@ jobs:
           test "$(find assets/img -type f | wc -l)" -eq 1324
           test "$(find assets/gif -type f | wc -l)" -eq 1324
 
+      - name: Fetch the food photography
+        # Not a hard gate, unlike the exercise media. Every food falls back to its category
+        # glyph when its photograph is missing, so a release with none of them is a plainer
+        # app rather than a broken one — and the images come from a public API that nobody
+        # here controls the uptime of.
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          ./tool/sync_food_media.sh || true
+          echo "food images: $(find assets/food -name '*.jpg' | wc -l)"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/nutrition_screen.dart';
+import 'screens/food_library_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/plan_screen.dart';
 import 'screens/routine_edit_screen.dart';
@@ -24,6 +26,8 @@ GoRouter buildRouter() => GoRouter(
         _page('/plan', (_, _) => const PlanScreen()),
         _page('/plan/r/:id', (_, s) => RoutineEditScreen(id: s.pathParameters['id']!)),
         _page('/workout', (_, _) => const WorkoutScreen()),
+        _page('/nutrition', (_, _) => const NutritionScreen()),
+        _page('/nutrition/foods', (_, _) => const FoodLibraryScreen()),
         _page('/stats', (_, _) => const StatsScreen()),
         _page('/history', (_, _) => const HistoryScreen()),
         _page('/library', (_, _) => const LibraryScreen()),

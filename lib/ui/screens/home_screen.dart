@@ -8,6 +8,7 @@ import '../../domain/format.dart';
 import '../../domain/glyphs.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
+import '../../domain/nutrition.dart';
 import '../../state/app_state_provider.dart';
 import '../sheets/plan_sheets.dart';
 import '../sheets/weight_sheets.dart';
@@ -21,6 +22,7 @@ import '../widgets/controls/app_button.dart';
 import '../widgets/controls/pressable.dart';
 import '../widgets/controls/surfaces.dart';
 import '../widgets/line_chart.dart';
+import '../widgets/macro_bar.dart';
 import '../widgets/media.dart';
 import '../widgets/page.dart';
 
@@ -56,8 +58,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _weekCard(context, s, today, routine, todayOverridden),
         if (s.routines.isEmpty && s.active == null) _welcomeCard(context),
         _bodyWeightCard(context, s, bw, delta),
+        _nutritionCard(context, s),
         _streakCard(context, s),
       ],
+    );
+  }
+
+  /// Today's calories, and a way in.
+  ///
+  /// Only appears once there is a profile to estimate from. An empty card inviting setup would
+  /// be on this screen forever for everyone who does not want the feature, and Home is the one
+  /// screen that has to stay about training.
+  Widget _nutritionCard(BuildContext context, AppState s) {
+    final c = context.c;
+    final target = macroTargets(s);
+    if (target == null) return const SizedBox.shrink();
+
+    final iso = todayISO();
+    final eaten = dayTotals(s, iso);
+    final dayTarget = macroTargets(s, iso: iso) ?? target;
+
+    return AppCard(
+      onTap: () => context.go('/nutrition'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(t('Today\'s food'),
+                    style: ts(TypeScale.foot, color: c.label2)),
+              ),
+              Text(
+                '${eaten.kcal.round()} / ${dayTarget.kcal.round()} ${t('kcal')}',
+                style: ts(TypeScale.foot, color: c.label, weight: FontWeight.w600),
+              ),
+              const SizedBox(width: 6),
+              AppIcon('chevronRight', size: 14, color: c.label3),
+            ],
+          ),
+          const SizedBox(height: 10),
+          MacroBars(eaten: eaten, target: dayTarget, compact: true),
+        ],
+      ),
     );
   }
 

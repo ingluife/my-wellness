@@ -48,6 +48,13 @@ app.*.map.json
 /assets/img/
 /assets/gif/
 
+# Food photography — fetched by tool/sync_food_media.sh from the sources listed in
+# tool/food_media.tsv. Like the exercise media, not ours to redistribute; see NOTICE.md.
+/assets/food/
+
+# The USDA dataset gen_foods.mjs reads (~200 MB unzipped). Re-fetched on demand.
+/tool/.cache/
+
 # Android release signing
 /android/key.properties
 /android/app/*.jks

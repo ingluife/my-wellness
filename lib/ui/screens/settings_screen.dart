@@ -6,12 +6,14 @@ import '../../data/models/app_state.dart';
 import '../../domain/format.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
+import '../../domain/nutrition.dart';
 import '../../state/app_state_provider.dart';
 import '../app.dart';
 import '../sheets/effort_help_sheet.dart';
 import '../../platform/backup.dart';
 import '../../platform/reminders.dart';
 import '../sheets/import_sheets.dart';
+import '../sheets/nutrition_sheets.dart';
 import '../sheets/plan_sheets.dart';
 import '../sheets/sheet_service.dart';
 import '../theme/app_colors.dart';
@@ -157,6 +159,42 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
               ]),
+            ),
+          ],
+        ),
+
+        // ---------- nutrition ----------
+        Section(
+          title: t('Nutrition'),
+          footer: s.nutrition.profile.isComplete
+              ? t('Your target is worked out from these and from the sessions in your plan.')
+              : t('Set these once and the app can work out what to eat around your training.'),
+          children: [
+            AppRow(
+              icon: 'person',
+              iconTint: c.sys.teal,
+              title: t('About you'),
+              subtitle: s.nutrition.profile.isComplete
+                  ? '${s.nutrition.profile.age!.round()} · '
+                      '${s.nutrition.profile.height!.round()} cm'
+                  : t('Not set'),
+              accessory: RowAccessory.chevron,
+              onTap: bodyProfileSheet,
+            ),
+            AppRow(
+              icon: 'target',
+              iconTint: c.acc,
+              title: t('Goal'),
+              subtitle: _goalLine(s),
+              accessory: RowAccessory.chevron,
+              onTap: nutritionGoalSheet,
+            ),
+            AppRow(
+              icon: 'meal',
+              iconTint: c.sys.orange,
+              title: t('Food & meals'),
+              accessory: RowAccessory.chevron,
+              onTap: () => context.go('/nutrition'),
             ),
           ],
         ),
@@ -323,6 +361,17 @@ class _AccentRow extends StatelessWidget {
 /// The schedule itself is resynced by the app whenever the plan or the time changes; this
 /// section only owns the OS permission prompt, which belongs to the moment the switch is
 /// turned on and nowhere else.
+/// "Lose 0.5 kg a week", or the mode alone when it has no rate.
+String _goalLine(AppState s) {
+  final g = s.nutrition.goal;
+  final mode = goalMode(g);
+  if (mode == 'maintain') return t('Maintain');
+  final rate = goalRate(g).abs();
+  return mode == 'cut'
+      ? t('Lose {0} kg a week', fmtNum(rate))
+      : t('Gain {0} kg a week', fmtNum(rate));
+}
+
 class ReminderSection extends ConsumerWidget {
   const ReminderSection({super.key, required this.state});
 

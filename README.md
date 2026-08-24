@@ -51,6 +51,23 @@ node tool/gen_tones.mjs         # assets/audio/*.wav             (the timer beep
 ./tool/sync_media.sh            # assets/img, assets/gif
 ```
 
+The nutrition feature has no upstream in openGym, so its data comes from public sources instead:
+
+```sh
+node tool/gen_foods.mjs         # assets/data/foods.json         (226 foods, USDA FoodData Central)
+node tool/fetch_food_media.mjs  # tool/food_media.tsv            (resolves a CC0 photo per food)
+./tool/sync_food_media.sh       # assets/food                    (downloads and crops them)
+```
+
+`tool/foods_seed.tsv` is the curated list — which foods exist, and which USDA record each one's
+numbers come from. It is hand-maintained; `gen_foods.mjs` only resolves it. **The `id` column is
+permanent**: a logged meal stores it, so renumbering would repoint every meal ever logged.
+
+`fetch_food_media.mjs` is rate-limited by Openverse (20/min, 200/day anonymous) and skips foods
+already in the manifest, so it is meant to be run more than once. `lib/ui/widgets/icon_paths_food.dart`
+is **not** generated — `gen_icons.mjs` overwrites `icon_paths.dart` wholesale, so the food glyphs
+are hand-drawn in a file it does not touch.
+
 ## Layout
 
 ```
@@ -60,12 +77,13 @@ lib/
 ├── domain/               pure logic, ported 1:1 from openGym's lib/
 │                         history · progression · effort · onerm · muscles · format
 │                         i18n · glyphs · exercises · starter · import_csv · plan_share
+│                         ...and, with no upstream: nutrition · met · foods
 ├── platform/             notifications, wake lock, backup/share
 ├── state/                the two stores: persisted state, and ephemeral UI state
 └── ui/
     ├── theme/            every token from openGym's index.css
-    ├── widgets/          the control set, the icon set, and three CustomPainters
-    │                     (line chart, heatmap, body map)
+    ├── widgets/          the control set, the icon set, and four CustomPainters
+    │                     (line chart, heatmap, body map, calorie ring)
     ├── screens/          one file per screen
     └── sheets/           the bottom-sheet flows
 ```
@@ -82,6 +100,12 @@ lib/
 - **The charts are hand-painted.** The geometry — a 12 % vertical margin, nice-number gridlines,
   a gradient that fades to nothing, relative muscle shading — is part of the design, not a
   setting a charting package exposes.
+- **Nutrition shows its own error bars.** A calorie target is built on a BMR equation fitted to a
+  population, a MET table inferred from a body part, and a portion size somebody eyeballed. Stats
+  compares what the log *predicted* against what the scale actually did and reports the gap,
+  because the only number that generalises to one person is whether these estimates run high or
+  low for them. `nutrition` and `meals` are the two keys myOpenGym adds that openGym has no
+  default for, and both stay absent from a backup until the feature is used.
 - **Progression is derived, never stored.** Fixing a mistyped set from three weeks ago
   immediately produces the right next target, because nothing was cached.
 
@@ -142,4 +166,6 @@ running workout always preserved across the swap.
 
 openGym is AGPL-3.0-or-later, and so is this. Exercise data and media come from
 `hasaneyldrm/exercises-dataset` (CC); the body geometry is converted from MuscleMap by
-Melih Colpan (MIT).
+Melih Colpan (MIT); the food catalogue is derived from USDA FoodData Central (public domain)
+and the food photography from Openverse (mostly CC BY / CC BY-SA, never NC), credited per image
+in `tool/food_media.tsv` and on screen beside each photo. See [NOTICE.md](NOTICE.md).

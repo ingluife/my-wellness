@@ -55,6 +55,9 @@ flutter:
     # 1,324 stills + 1,324 animations, populated by tool/sync_media.sh (git-ignored)
     - assets/img/
     - assets/gif/
+    # Food photography, populated by tool/sync_food_media.sh from tool/food_media.tsv
+    # (git-ignored). Absent art falls back to a category glyph, so a checkout without it runs.
+    - assets/food/
     - assets/branding/
 
 # The app mark: openGym's dumbbell glyph on its own background, so the launcher icon, the

@@ -31,12 +31,13 @@ class AppTabBar extends StatelessWidget {
   /// A running workout turns the disc orange and gives it a pulsing ring.
   final bool workoutRunning;
 
-  /// History is reached from Stats and Settings from Home, so each keeps its parent lit rather
-  /// than leaving no tab selected at all.
+  /// History is reached from Stats, and Settings and Nutrition from Home, so each keeps its
+  /// parent lit rather than leaving no tab selected at all.
   bool _isOn(String key) =>
       current == key ||
       (current == 'history' && key == 'stats') ||
-      (current == 'settings' && key == 'home');
+      (current == 'settings' && key == 'home') ||
+      (current == 'nutrition' && key == 'home');
 
   @override
   Widget build(BuildContext context) {

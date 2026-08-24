@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'domain/exercises.dart';
+import 'domain/foods.dart';
 import 'state/app_state_provider.dart';
 import 'ui/app.dart';
 
@@ -16,6 +17,7 @@ Future<void> main() async {
   // The catalogue and the profile both have to be in hand before the first frame: the app
   // opens on Home, which reads today's routine and therefore an exercise the plan names.
   await Exercises.instance.load();
+  await Foods.instance.load();
   await container.read(appStateProvider.notifier).boot();
 
   runApp(
