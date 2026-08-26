@@ -44,6 +44,92 @@ void main() {
     }
   });
 
+  group('household portions', () {
+    test('most of the catalogue offers at least one', () {
+      final withPortions = all.where((f) => f.portions.isNotEmpty).length;
+      // 199 of 226 at the time of writing; the floor guards against a filter change that
+      // quietly throws most of them away.
+      expect(withPortions, greaterThan(180));
+    });
+
+    test('no portion is a bare weight or volume unit', () {
+      // The trap this exists for: the bulk USDA dataset drops the `amount` field the API
+      // carries, so `{modifier: "oz", gramWeight: 113}` is FOUR ounces of chicken. Rendered as
+      // "1 oz" it would be wrong by a factor of four, and wrong invisibly — every number on
+      // screen would still look plausible.
+      final ambiguous = RegExp(
+          r'^(oz|lb|lbs|fl oz|g|kg|mg|ml|l|liter|litre|gram|grams|pound|pounds|ounce|ounces)$',
+          caseSensitive: false);
+      for (final f in all) {
+        for (final p in f.portions) {
+          expect(ambiguous.hasMatch(p.n), isFalse, reason: '${f.n}: "${p.n}"');
+        }
+      }
+    });
+
+    test('no portion is a way of buying rather than a way of eating', () {
+      final bulk = RegExp(r'package|bunch|as purchased|container|carton|loaf|yields',
+          caseSensitive: false);
+      for (final f in all) {
+        for (final p in f.portions) {
+          expect(bulk.hasMatch(p.n), isFalse, reason: '${f.n}: "${p.n}"');
+        }
+      }
+    });
+
+    test('every portion is a plausible single serving', () {
+      for (final f in all) {
+        for (final p in f.portions) {
+          expect(p.g, greaterThan(0), reason: '${f.n}: ${p.n}');
+          expect(p.g, lessThanOrEqualTo(400), reason: '${f.n}: ${p.n}');
+          expect(p.n, isNotEmpty, reason: f.n);
+          // Parenthetical sizing is stripped — nobody eats by 2-3/8" diameter.
+          expect(p.n, isNot(contains('(')), reason: '${f.n}: ${p.n}');
+        }
+      }
+    });
+
+    test('portions read smallest first, and are named the way people speak', () {
+      final egg = all.firstWhere((f) => f.n == 'Egg, whole');
+      expect(egg.portions.map((p) => p.n), containsAll(['small', 'medium', 'large']));
+      for (var i = 1; i < egg.portions.length; i++) {
+        expect(egg.portions[i].g, greaterThanOrEqualTo(egg.portions[i - 1].g));
+      }
+      // A natural count noun beats a cup: eggs are eaten by the egg.
+      expect(egg.portions.first.n, isNot(startsWith('cup')));
+    });
+
+    test('a portion resolves to the same macros as its grams', () {
+      final bread = all.firstWhere((f) => f.n == 'White bread');
+      final slice = bread.portions.firstWhere((p) => p.n == 'slice');
+      final item = bread.portion(slice.g);
+      expect(item.g, slice.g);
+      expect(item.kcal, closeTo(bread.kcal * slice.g / 100, 1e-9));
+    });
+  });
+
+  group('fibre', () {
+    test('almost every food carries one', () {
+      expect(all.where((f) => f.fib != null).length, greaterThan(200));
+    });
+
+    test('it scales with the portion, and is null when unknown', () {
+      final oats = all.firstWhere((f) => f.n == 'Oats');
+      expect(oats.fib, greaterThan(0));
+      expect(oats.fibreIn(200), closeTo(oats.fib! * 2, 1e-9));
+
+      const bare = Food(id: 'x', n: 'x', cat: 'veg', kcal: 1, p: 0, c: 0, f: 0);
+      expect(bare.fibreIn(100), isNull);
+    });
+
+    test('fibre never exceeds the carbohydrate it is part of', () {
+      for (final f in all) {
+        if (f.fib == null) continue;
+        expect(f.fib, lessThanOrEqualTo(f.c + 0.51), reason: '${f.n}: ${f.fib}F vs ${f.c}C');
+      }
+    });
+  });
+
   group('attribution', () {
     test('a food with a photograph credits whoever took it', () {
       // Most of these images are CC BY or CC BY-SA, so the credit has to reach the screen.

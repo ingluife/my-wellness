@@ -27,8 +27,81 @@ const URL_BASE = 'https://fdc.nal.usda.gov/fdc-datasets'
 const here = p => fileURLToPath(new URL(p, import.meta.url))
 const cache = here('.cache')
 
-// The four the app tracks. FDC numbers them; the names are what the records call them.
-const NUTRIENT = { kcal: 1008, p: 1003, c: 1005, f: 1004 }
+// The nutrients the app tracks. FDC numbers them; the names are what the records call them.
+// Fibre is carried but never given a target of its own — it earns its place because satiety is
+// what makes a deficit survivable, not because it is a fifth number to hit.
+const NUTRIENT = { kcal: 1008, p: 1003, c: 1005, f: 1004, fib: 1079 }
+
+/**
+ * Household portions, filtered down to the ones that are not lies.
+ *
+ * The bulk dataset drops the `amount` field the API carries: a portion arrives as
+ * `{ modifier: 'oz', gramWeight: 113 }`, which is four ounces of chicken, not one. For count
+ * nouns ('slice', 'fillet', 'medium') and for cups and spoons the implied amount is reliably
+ * one; for bare weight and volume units it is not recoverable, and "1 oz = 113 g" on screen
+ * would be worse than offering nothing at all. Those are dropped — 99 rows of 690, leaving 206
+ * of the 226 foods with at least one usable portion.
+ */
+const AMBIGUOUS_UNIT = /^(oz|lb|lbs|fl oz|g|kg|mg|ml|l|liter|litre|gram|grams|pound|pounds|ounce|ounces)$/i
+
+// How something is bought, not how much of it gets eaten. A chicken breast record offers
+// "package = 926 g"; broccoli offers "bunch = 608 g". Both are true and neither is a meal.
+const BULK = /package|bunch|as purchased|container|carton|bottle|\bcan\b|\bbox\b|\bbag\b|loaf|\bhead\b|crust not eaten|yields|refuse/i
+
+// The units people actually think in, most natural first. A portion whose label is one of
+// these leads, so eggs offer "medium" before "cup" and bread offers "slice" before "cup, cubes".
+const NATURAL = [
+  /^(slice|piece|fillet|egg|breast|thigh|wing|drumstick|link|patty|steak|chop)/i,
+  /^(small|medium|large|extra large|half|whole)/i,
+  /^(fruit|berry|clove|leaf|spear|stalk|floret|ear|pod|nut|kernel)/i,
+  /^serving/i,
+  /^cup/i,
+  /^(tbsp|tablespoon|tsp|teaspoon)/i,
+]
+
+/** A single portion is rarely more than this. Above it, the record is describing a shop. */
+const MAX_PORTION_G = 400
+
+/**
+ * Household portions, filtered down to the ones that are not lies.
+ *
+ * The bulk dataset drops the `amount` field the API carries: a portion arrives as
+ * `{ modifier: 'oz', gramWeight: 113 }`, which is four ounces of chicken, not one. For count
+ * nouns ('slice', 'fillet', 'medium') and for cups and spoons the implied amount is reliably
+ * one; for bare weight and volume units it is not recoverable, and "1 oz = 113 g" on screen
+ * would be worse than offering nothing at all.
+ */
+function portionsOf(rec) {
+  const seen = new Set()
+  const rows = []
+  for (const p of rec.foodPortions ?? []) {
+    if (!(p.gramWeight > 0) || p.gramWeight > MAX_PORTION_G) continue
+    let label = (p.modifier ?? p.measureUnit?.name ?? '').trim()
+    if (!label || label === 'undetermined') continue
+    // "NLEA serving" means nothing outside a regulatory document.
+    label = label.replace(/^nlea serving$/i, 'serving')
+    // Parenthetical sizing ('fruit (2-3/8" dia)') is precision nobody eats by.
+    label = label.replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim()
+    if (!label || AMBIGUOUS_UNIT.test(label) || BULK.test(label)) continue
+
+    const key = label.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    const rank = NATURAL.findIndex(re => re.test(label))
+    rows.push({
+      n: label,
+      g: Math.round(p.gramWeight),
+      // Unrecognised labels sort last rather than being dropped: they are still true, and a
+      // catalogue this size will always have a few shapes the list has not met.
+      rank: rank === -1 ? NATURAL.length : rank,
+    })
+  }
+
+  rows.sort((a, b) => a.rank - b.rank || a.g - b.g)
+  // Four is as many as the chip row shows without wrapping to a second line.
+  return rows.slice(0, 4).sort((a, b) => a.g - b.g).map(({ n, g }) => ({ n, g }))
+}
 
 function datasetPath() {
   const i = process.argv.indexOf('--src')
@@ -106,6 +179,7 @@ for (const row of seed) {
   if (m.kcal == null) { missing.push(`${row.id} ${row.name} (no energy)`); continue }
 
   const credit = media.get(row.id)
+  const por = portionsOf(rec)
   out.push({
     id: row.id,
     n: row.name,
@@ -114,6 +188,8 @@ for (const row of seed) {
     p: g(m.p),
     c: g(m.c),
     f: g(m.f),
+    ...(m.fib != null ? { fib: g(m.fib) } : {}),
+    ...(por.length ? { por } : {}),
     // A food with no manifest row has no photograph and falls back to its category glyph, so
     // it carries no filename either — that absence is what the app keys off.
     ...(credit ? { img: imageName(row.id, row.name) } : {}),
@@ -140,4 +216,6 @@ writeFileSync(here('../assets/data/foods.json'), JSON.stringify(out))
 const byCat = {}
 for (const f of out) byCat[f.cat] = (byCat[f.cat] ?? 0) + 1
 console.log(`foods.json — ${out.length} foods`)
+console.log(`  ${out.filter(f => f.por).length} with household portions · ` +
+            `${out.filter(f => f.fib != null).length} with fibre`)
 console.log(Object.entries(byCat).map(([k, v]) => `${k}:${v}`).join(' '))

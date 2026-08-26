@@ -12,6 +12,23 @@ import 'i18n.dart';
 /// down to the `or()` placeholder, because a logged meal holds a food id and that lookup has to
 /// keep working after a catalogue regeneration, a backup from another device, or a custom food
 /// deleted somewhere else.
+/// A household measure for a food: "1 slice = 29 g".
+///
+/// Grams are what the maths needs and what almost nobody can estimate. These come from USDA's
+/// own portion tables, filtered in tool/gen_foods.mjs to the ones whose implied amount is
+/// reliably one — see the comment there, because the trap is not obvious.
+class FoodPortion {
+  const FoodPortion({required this.n, required this.g});
+
+  /// 'slice', 'medium', 'cup, chopped'. An English source string, so its own i18n key.
+  final String n;
+
+  final double g;
+
+  factory FoodPortion.fromJson(Map<String, dynamic> j) =>
+      FoodPortion(n: asStr(j['n']) ?? '', g: asNumOr(j['g'], 0));
+}
+
 class Food {
   const Food({
     required this.id,
@@ -25,6 +42,8 @@ class Food {
     this.src,
     this.by,
     this.lic,
+    this.fib,
+    this.portions = const [],
     this.custom = false,
     this.missing = false,
   });
@@ -50,6 +69,17 @@ class Food {
 
   /// `usda:171077` — which record the numbers came from, so any of them can be checked.
   final String? src;
+
+  /// Grams of fibre per 100 g.
+  ///
+  /// Tracked but never given a target. Fibre is why a deficit is survivable — it is most of
+  /// what makes a meal filling — but a fifth number to hit would work against teaching one
+  /// thing at a time.
+  final double? fib;
+
+  /// Household measures, smallest first. Empty for a custom food, and for the 27 catalogue
+  /// foods whose USDA portions were all bulk or ambiguous.
+  final List<FoodPortion> portions;
 
   /// Who took the photograph, and under what licence.
   ///
@@ -89,6 +119,11 @@ class Food {
         src: asStr(j['src']),
         by: asStr(j['by']),
         lic: asStr(j['lic']),
+        fib: asNum(j['fib']),
+        portions: [
+          for (final p in (j['por'] is List ? j['por'] as List : const []))
+            if (p is Map) FoodPortion.fromJson(Map<String, dynamic>.from(p))
+        ],
       );
 
   factory Food.fromCustom(CustomFood c) => Food(
@@ -112,6 +147,9 @@ class Food {
         c: c * grams / 100,
         f: f * grams / 100,
       );
+
+  /// Fibre in a portion of [grams], or null when the food has no fibre figure.
+  double? fibreIn(double grams) => fib == null ? null : fib! * grams / 100;
 }
 
 /// The catalogue order the library browses in, and the order category chips appear in:

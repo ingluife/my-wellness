@@ -124,6 +124,84 @@ void main() {
     await tester.pump();
     expect(value, 0);
   });
+
+  group('NumberBox', () {
+    Widget box({double? max, ValueChanged<double?>? onChanged}) => SizedBox(
+          width: 120,
+          child: NumberBox(
+            value: null,
+            nullable: true,
+            max: max,
+            onChanged: onChanged ?? (_) {},
+          ),
+        );
+
+    testWidgets('reports what is typed', (tester) async {
+      double? got;
+      await tester.pumpWidget(host(box(onChanged: (v) => got = v)));
+      await tester.enterText(find.byType(NumberBox), '178');
+      await tester.pumpAndSettle();
+      expect(got, 178);
+    });
+
+    testWidgets('holds at its ceiling as the number is typed', (tester) async {
+      double? got;
+      await tester.pumpWidget(host(box(max: 100, onChanged: (v) => got = v)));
+
+      await tester.enterText(find.byType(NumberBox), '9');
+      await tester.pumpAndSettle();
+      expect(got, 9, reason: 'still on the way up');
+
+      await tester.enterText(find.byType(NumberBox), '999');
+      await tester.pumpAndSettle();
+      expect(got, 100, reason: 'clamped');
+      // ...and the field shows the clamped value rather than lying about what it holds.
+      expect(find.text('100'), findsOneWidget);
+    });
+
+    testWidgets('has no floor, so a number on its way up is not rewritten', (tester) async {
+      // Clamping upward would turn "1" into "13" while someone was still typing "18".
+      double? got;
+      await tester.pumpWidget(host(box(max: 100, onChanged: (v) => got = v)));
+      await tester.enterText(find.byType(NumberBox), '1');
+      await tester.pumpAndSettle();
+      expect(got, 1);
+    });
+
+    testWidgets('clearing it reports null, not zero', (tester) async {
+      // "not said" and "zero" are different answers — a profile with no age is not a newborn.
+      double? got;
+      await tester.pumpWidget(host(box(onChanged: (v) => got = v)));
+      await tester.enterText(find.byType(NumberBox), '42');
+      await tester.pumpAndSettle();
+      expect(got, 42);
+
+      await tester.enterText(find.byType(NumberBox), '');
+      await tester.pumpAndSettle();
+      expect(got, isNull);
+    });
+
+    testWidgets('letters and stray separators are dropped', (tester) async {
+      double? got;
+      await tester.pumpWidget(host(box(onChanged: (v) => got = v)));
+      await tester.enterText(find.byType(NumberBox), '1a2b,5');
+      await tester.pumpAndSettle();
+      expect(got, 12.5);
+    });
+
+    testWidgets('is big enough to tap, and paints in both themes', (tester) async {
+      for (final b in Brightness.values) {
+        await tester.pumpWidget(host(box(), brightness: b));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: b.name);
+        // A 22 px invisible target on a 46 px row is what made the first attempt unusable.
+        expect(tester.getSize(find.byType(NumberBox)).height,
+            greaterThanOrEqualTo(40), reason: b.name);
+      }
+    });
+  });
 }
+
+
 
 void _noop(String _) {}

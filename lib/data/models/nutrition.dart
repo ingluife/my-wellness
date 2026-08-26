@@ -121,13 +121,28 @@ class NutritionGoal {
 /// user already set. A second copy of that schedule would go stale the first time a routine
 /// moved to another day.
 class Nutrition {
-  Nutrition({BodyProfile? profile, NutritionGoal? goal, List<CustomFood>? foods})
-      : profile = profile ?? BodyProfile(),
+  Nutrition({
+    BodyProfile? profile,
+    NutritionGoal? goal,
+    List<CustomFood>? foods,
+    List<MealTemplate>? templates,
+    this.dismissedAdj,
+  })  : profile = profile ?? BodyProfile(),
         goal = goal ?? NutritionGoal(),
-        foods = foods ?? [];
+        foods = foods ?? [],
+        templates = templates ?? [];
 
   BodyProfile profile;
   NutritionGoal goal;
+
+  /// Meals saved for one-tap logging.
+  List<MealTemplate> templates;
+
+  /// When a suggested target adjustment was last turned down, as ms since epoch.
+  ///
+  /// Kept so the offer does not become nagging: a suggestion declined once should stay declined
+  /// until either enough time has passed or the evidence has actually changed.
+  int? dismissedAdj;
 
   /// Foods the user defined. Kept here rather than beside `customEx` at the top level so the
   /// whole feature stays inside one key that openGym can carry through as a unit.
@@ -135,12 +150,19 @@ class Nutrition {
 
   /// Nothing has been set — the key is dropped entirely so a profile that never opened the
   /// feature still exports the same JSON openGym does.
-  bool get isDefault => profile.isEmpty && goal.isDefault && foods.isEmpty;
+  bool get isDefault =>
+      profile.isEmpty &&
+      goal.isDefault &&
+      foods.isEmpty &&
+      templates.isEmpty &&
+      dismissedAdj == null;
 
   factory Nutrition.fromJson(Map<String, dynamic> j) => Nutrition(
         profile: j['profile'] is Map ? BodyProfile.fromJson(asMap(j['profile'])) : null,
         goal: j['goal'] is Map ? NutritionGoal.fromJson(asMap(j['goal'])) : null,
         foods: asList(j['foods'], CustomFood.fromJson),
+        templates: asList(j['templates'], MealTemplate.fromJson),
+        dismissedAdj: asNum(j['dismissedAdj'])?.toInt(),
       );
 
   Map<String, dynamic> toJson() {
@@ -150,6 +172,10 @@ class Nutrition {
     if (p.isNotEmpty) m['profile'] = p;
     if (g.isNotEmpty) m['goal'] = g;
     if (foods.isNotEmpty) m['foods'] = [for (final f in foods) f.toJson()];
+    if (templates.isNotEmpty) {
+      m['templates'] = [for (final x in templates) x.toJson()];
+    }
+    put(m, 'dismissedAdj', dismissedAdj);
     return m;
   }
 
@@ -258,6 +284,53 @@ class MealItem {
   }
 
   MealItem copy() => MealItem.fromJson(toJson());
+}
+
+/// A meal worth logging again.
+///
+/// Most people rotate ten to fifteen meals. Without this the app makes them rebuild each one
+/// food by food every time, which is the single biggest reason a food log gets abandoned in
+/// week one.
+class MealTemplate {
+  MealTemplate({
+    required this.id,
+    required this.n,
+    List<MealItem>? items,
+    this.used,
+    this.last,
+  }) : items = items ?? [];
+
+  final String id;
+  String n;
+  List<MealItem> items;
+
+  /// Times logged, and when it was last logged. Together they order the list by what the user
+  /// actually eats, the way recent foods are already ordered.
+  double? used;
+  int? last;
+
+  double get kcal => items.fold(0, (a, i) => a + i.kcal);
+  double get p => items.fold(0, (a, i) => a + i.p);
+  double get c => items.fold(0, (a, i) => a + i.c);
+  double get f => items.fold(0, (a, i) => a + i.f);
+
+  factory MealTemplate.fromJson(Map<String, dynamic> j) => MealTemplate(
+        id: asStr(j['id']) ?? '',
+        n: asStr(j['n']) ?? '',
+        items: asList(j['items'], MealItem.fromJson),
+        used: asNum(j['used']),
+        last: asNum(j['last'])?.toInt(),
+      );
+
+  Map<String, dynamic> toJson() {
+    final m = <String, dynamic>{'id': id, 'n': n};
+    m['items'] = [for (final i in items) i.toJson()];
+    putNum(m, 'used', used);
+    put(m, 'last', last);
+    return m;
+  }
+
+  MealTemplate copy() => MealTemplate.fromJson(toJson());
 }
 
 /// One meal on one day. `d` is the day it counts against; `t` is the wall clock it was logged

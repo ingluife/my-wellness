@@ -413,6 +413,131 @@ void main() {
     });
   });
 
+  group('the weekly budget', () {
+    test('sums each day\'s own target, so training days are priced in', () {
+      final s = profiled();
+      final r = Routine(id: 'r1', name: 'Push', ex: [ExerciseConfig(id: '0025', sets: 10)]);
+      s.routines.add(r);
+      final flat = weekBudget(s, todayISO()).budget;
+
+      // Three training days a week has to be worth more than none.
+      for (final d in ['1', '3', '5']) {
+        s.week[d] = 'r1';
+      }
+      expect(weekBudget(s, todayISO()).budget, greaterThan(flat));
+    });
+
+    test('spends only days that have happened', () {
+      final s = profiled();
+      final week = weekDays(todayISO());
+      final future = week.where((d) => d.compareTo(todayISO()) > 0).toList();
+      if (future.isEmpty) return; // Sunday: nothing to assert.
+
+      s.meals.add(meal(future.first, [item(kcal: 900)]));
+      // Something logged against Friday on a Tuesday is not money already spent.
+      expect(weekBudget(s, todayISO()).spent, 0);
+    });
+
+    test('today still counts as a day you can spend', () {
+      final s = profiled();
+      final b = weekBudget(s, todayISO());
+      expect(b.daysLeft, greaterThanOrEqualTo(1));
+      expect(b.perDayLeft, closeTo(b.left / b.daysLeft, 1e-9));
+    });
+
+    test('what is left is the budget less what has gone', () {
+      final s = profiled();
+      s.meals.add(meal(todayISO(), [item(kcal: 800, p: 60, c: 80, f: 25)]));
+      final b = weekBudget(s, todayISO());
+      expect(b.spent, 800);
+      expect(b.left, closeTo(b.budget - 800, 1e-9));
+    });
+
+    test('a week is seven days of the daily target when nothing is trained', () {
+      final s = profiled();
+      final daily = macroTargets(s, iso: todayISO())!.kcal;
+      expect(weekBudget(s, todayISO()).budget, closeTo(daily * 7, 1));
+    });
+  });
+
+  group('saved meals', () {
+    MealItem it(String fid, double g) =>
+        MealItem(fid: fid, g: g, kcal: g, p: g / 5, c: 0, f: 0);
+
+    test('the same meal logged twice has the same signature', () {
+      final a = [it('f0010', 200), it('f0107', 150)];
+      final b = [it('f0010', 200), it('f0107', 150)];
+      expect(signatureOf(a), signatureOf(b));
+    });
+
+    test('order does not make it a different meal', () {
+      expect(signatureOf([it('f0010', 200), it('f0107', 150)]),
+          signatureOf([it('f0107', 150), it('f0010', 200)]));
+    });
+
+    test('grams are rounded, so weighing imprecisely is still the same meal', () {
+      // 148 g and 150 g of chicken is the same breakfast. Nobody weighs to the gram, and
+      // treating them as distinct would mean the repeat offer never fires.
+      expect(signatureOf([it('f0010', 148)]), signatureOf([it('f0010', 150)]));
+      // ...but a genuinely different portion is a different meal.
+      expect(signatureOf([it('f0010', 100)]), isNot(signatureOf([it('f0010', 200)])));
+    });
+
+    test('a meal repeated three times is offered, twice is not', () {
+      final s = profiled();
+      for (var i = 0; i < 2; i++) {
+        s.meals.add(meal(daysAgo(i), [it('f0010', 200)]));
+      }
+      expect(repeatedMeals(s), isEmpty);
+
+      s.meals.add(meal(daysAgo(2), [it('f0010', 200)]));
+      final found = repeatedMeals(s);
+      expect(found, hasLength(1));
+      expect(found.single.count, 3);
+    });
+
+    test('a meal already saved is never offered again', () {
+      final s = profiled();
+      for (var i = 0; i < 4; i++) {
+        s.meals.add(meal(daysAgo(i), [it('f0010', 200)]));
+      }
+      expect(repeatedMeals(s), hasLength(1));
+
+      s.nutrition.templates.add(MealTemplate(id: 'mt1', n: 'Usual', items: [it('f0010', 200)]));
+      expect(repeatedMeals(s), isEmpty);
+    });
+
+    test('saved meals are ordered by use, then by recency', () {
+      final s = profiled();
+      s.nutrition.templates.addAll([
+        MealTemplate(id: 'a', n: 'Rare', used: 1, last: 9000),
+        MealTemplate(id: 'b', n: 'Often', used: 9, last: 1000),
+        MealTemplate(id: 'c', n: 'Also often', used: 9, last: 5000),
+      ]);
+      // A breakfast eaten every weekday outranks last night's dinner.
+      expect(orderedTemplates(s).map((x) => x.id), ['c', 'b', 'a']);
+    });
+
+    test('logged days come back newest first, and the target day is excluded', () {
+      final s = profiled();
+      s.meals
+        ..add(meal(daysAgo(3), [it('f0010', 100)]))
+        ..add(meal(daysAgo(1), [it('f0010', 100)]))
+        ..add(meal(daysAgo(0), [it('f0010', 100)]));
+      expect(loggedDays(s), [daysAgo(0), daysAgo(1), daysAgo(3)]);
+      expect(loggedDays(s, excluding: daysAgo(0)), [daysAgo(1), daysAgo(3)]);
+    });
+
+    test('an empty meal is not something to repeat', () {
+      final s = profiled();
+      for (var i = 0; i < 4; i++) {
+        s.meals.add(meal(daysAgo(i), []));
+      }
+      expect(repeatedMeals(s), isEmpty);
+      expect(loggedDays(s), isEmpty);
+    });
+  });
+
   group('the meal split', () {
     test('shares add up to the whole day', () {
       for (var n = 1; n <= 8; n++) {

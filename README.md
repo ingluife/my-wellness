@@ -55,13 +55,33 @@ The nutrition feature has no upstream in openGym, so its data comes from public 
 
 ```sh
 node tool/gen_foods.mjs         # assets/data/foods.json         (226 foods, USDA FoodData Central)
+                                #                                 + household portions and fibre
 node tool/fetch_food_media.mjs  # tool/food_media.tsv            (resolves a CC0 photo per food)
 ./tool/sync_food_media.sh       # assets/food                    (downloads and crops them)
+node tool/check_i18n_nutrition.mjs   # validates tool/locales_nutrition/*.js before a regen
 ```
+
+Its **strings** have no upstream either, so they live in `tool/locales_nutrition/<lang>.js` — 562
+keys per language, covering the screens and coaching copy, the meal slots, the food categories,
+and the food and portion names the catalogue is written in. `gen_i18n.mjs` merges them over
+openGym's pack for each language, which is the only reason a re-run does not wipe them; edit the
+overlay, never `assets/i18n/*.json`.
+
+`tool/nutrition_keys.json` is the English key list the overlay is checked against — the grouped
+set of source strings the feature uses, so a key quietly dropped from all eleven files is still
+caught. Add a `t('…')` to the nutrition screens and it belongs there too.
+`check_i18n_nutrition.mjs` catches the mistakes review does not — a dropped key, a translation
+that lost its `{0}`, a stray character from another alphabet — and `test/i18n_test.dart` asserts
+the same invariants against the packs that actually ship.
 
 `tool/foods_seed.tsv` is the curated list — which foods exist, and which USDA record each one's
 numbers come from. It is hand-maintained; `gen_foods.mjs` only resolves it. **The `id` column is
 permanent**: a logged meal stores it, so renumbering would repoint every meal ever logged.
+
+Household portions come from the same USDA records, with one trap worth knowing about: the bulk
+dataset drops the `amount` field the API carries, so `{modifier: "oz", gramWeight: 113}` is
+*four* ounces, not one. `gen_foods.mjs` discards bare weight and volume units for that reason and
+keeps the count nouns, where the implied amount is reliably one. A test asserts none leak back in.
 
 `fetch_food_media.mjs` is rate-limited by Openverse (20/min, 200/day anonymous) and skips foods
 already in the manifest, so it is meant to be run more than once. `lib/ui/widgets/icon_paths_food.dart`
@@ -78,6 +98,7 @@ lib/
 │                         history · progression · effort · onerm · muscles · format
 │                         i18n · glyphs · exercises · starter · import_csv · plan_share
 │                         ...and, with no upstream: nutrition · met · foods
+│                         coaching (what to say next) · day_plan (what a day looks like)
 ├── platform/             notifications, wake lock, backup/share
 ├── state/                the two stores: persisted state, and ephemeral UI state
 └── ui/
@@ -100,6 +121,9 @@ lib/
 - **The charts are hand-painted.** The geometry — a 12 % vertical margin, nice-number gridlines,
   a gradient that fades to nothing, relative muscle shading — is part of the design, not a
   setting a charting package exposes.
+- **A plan is an intention; the log is a record.** Generated day plans are never written into
+  `meals` — each meal is logged when it is actually eaten. Anything else would put food nobody
+  ate into the comparison below, which is the one number here that can be checked.
 - **Nutrition shows its own error bars.** A calorie target is built on a BMR equation fitted to a
   population, a MET table inferred from a body part, and a portion size somebody eyeballed. Stats
   compares what the log *predicted* against what the scale actually did and reports the gap,

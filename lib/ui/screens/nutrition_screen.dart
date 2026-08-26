@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/models/app_state.dart';
+import '../../domain/coaching.dart';
 import '../../domain/format.dart';
-import '../../domain/foods.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
 import '../../domain/nutrition.dart';
 import '../../state/app_state_provider.dart';
+import '../app.dart';
+import '../sheets/day_plan_sheet.dart';
 import '../sheets/nutrition_sheets.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -18,6 +20,7 @@ import '../widgets/app_icon.dart';
 import '../widgets/controls/app_button.dart';
 import '../widgets/controls/pressable.dart';
 import '../widgets/controls/surfaces.dart';
+import '../widgets/controls/toggles.dart';
 import '../widgets/macro_bar.dart';
 import '../widgets/page.dart';
 
@@ -36,6 +39,10 @@ class NutritionScreen extends ConsumerStatefulWidget {
 class _NutritionScreenState extends ConsumerState<NutritionScreen> {
   String _iso = todayISO();
 
+  /// Day is the default; the week is a second lens, not a replacement. The daily number is
+  /// what you act on at dinner; the weekly one is what actually determines the outcome.
+  bool _weekly = false;
+
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(appStateProvider);
@@ -51,7 +58,17 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
         if (!ready)
           _setupCard(context, s)
         else ...[
-          _todayCard(context, s),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Segmented<bool>(
+              value: _weekly,
+              options: [SegOption(false, label: t('Day')), SegOption(true, label: t('Week'))],
+              onChanged: (v) => setState(() => _weekly = v),
+            ),
+          ),
+          _focusCard(context, s),
+          _adjustmentCard(context, s),
+          if (_weekly) _weekCard2(context, s) else _todayCard(context, s),
           _weekCard(context, s),
           _mealsCard(context, s),
           _sourcesCard(context),
@@ -113,7 +130,21 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _line(context, t('Target'), '${target.kcal.round()}'),
+                    Pressable(
+                      scale: 1,
+                      onTap: () => targetBreakdownSheet(iso: _iso),
+                      child: Row(children: [
+                        Expanded(
+                          child: Text(t('Target'), style: ts(TypeScale.foot, color: c.label2)),
+                        ),
+                        Text('${target.kcal.round()}',
+                            style: ts(TypeScale.body,
+                                color: c.label, weight: FontWeight.w600)),
+                        const SizedBox(width: 3),
+                        AppIcon('info', size: 12, color: c.label3),
+                      ]),
+                    ),
+                    const SizedBox(height: 6),
                     _line(context, t('Eaten'), '${eaten.kcal.round()}'),
                     if (burn > 0)
                       _line(context, t('Training'), '+${burn.round()}', tint: c.sys.orange),
@@ -127,6 +158,179 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
         ],
       ),
     );
+  }
+
+  /// One thing to work on, and the number that says so.
+  ///
+  /// Never a list. Someone told to fix five things fixes none of them, and the ordering here
+  /// is the actual hierarchy: you cannot hit a target you are not measuring, protein is what
+  /// protects lean mass in a deficit, and total calories decide the direction.
+  Widget _focusCard(BuildContext context, AppState s) {
+    final c = context.c;
+    final f = focusOf(s);
+
+    final (icon, title, body) = switch (f.what) {
+      NutritionFocus.logConsistently => (
+          'clipboard',
+          t('Log what you eat'),
+          t('{0} of the last 14 days so far. Nothing else here means much until there are about seven — an unlogged day reads as a day you did not eat.', f.loggedDays),
+        ),
+      NutritionFocus.hitProtein => (
+          'fish',
+          t('Get your protein in'),
+          t('You hit it on {0}% of logged days. It is the one macro worth chasing — in a deficit it is what keeps the weight you lose from being muscle.', (f.proteinRate * 100).round()),
+        ),
+      NutritionFocus.hitCalories => (
+          'target',
+          t('Close in on your calories'),
+          t('Protein is handled. You land near your calorie target on {0}% of days — that is the number that decides which direction the scale moves.', (f.kcalRate * 100).round()),
+        ),
+      NutritionFocus.refine => (
+          'checkCircle',
+          t('This is working'),
+          t('Protein and calories are both landing. Keep going, and let Stats tell you whether the scale agrees.'),
+        ),
+    };
+
+    return AppCard(
+      borderColor: f.what == NutritionFocus.refine ? null : c.accLine,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppIcon(icon, size: 20, color: c.acc),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: ts(TypeScale.body, color: c.label, weight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(body, style: ts(TypeScale.cap, color: c.label2)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// A target change the scale is asking for — offered, never applied.
+  Widget _adjustmentCard(BuildContext context, AppState s) {
+    final c = context.c;
+    final a = suggestedAdjustment(s);
+    if (a == null) return const SizedBox.shrink();
+
+    return AppCard(
+      borderColor: c.sys.orange.withValues(alpha: .5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            AppIcon('chartLine', size: 18, color: c.sys.orange),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(t('Your target may be off'),
+                  style: ts(TypeScale.body, color: c.label, weight: FontWeight.w600)),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(
+            '${a.reason} ${a.delta < 0 ? t('Dropping the target by {0} would match what is actually happening.', a.delta.abs().round()) : t('There is room for {0} more a day.', a.delta.round())}',
+            style: ts(TypeScale.cap, color: c.label2),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: AppButton(
+                t('Use {0}', '${a.kcal.round()}'),
+                variant: BtnVariant.primary,
+                size: BtnSize.sm,
+                onTap: () {
+                  ref.read(appStateProvider.notifier).update((st) {
+                    st.nutrition.goal.kcal = a.kcal;
+                    st.nutrition.dismissedAdj = null;
+                  });
+                  ref.read(uiProvider).toast(t('Target set to {0}', '${a.kcal.round()}'));
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: AppButton(
+                t('Not now'),
+                size: BtnSize.sm,
+                onTap: () => ref.read(appStateProvider.notifier).update((st) =>
+                    st.nutrition.dismissedAdj = DateTime.now().millisecondsSinceEpoch),
+              ),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  /// The week as a budget with a running balance.
+  ///
+  /// The teaching is in `perDayLeft`: under on Tuesday buys you Saturday, and that is both how
+  /// the physiology works and the only version of this anyone sustains.
+  Widget _weekCard2(BuildContext context, AppState s) {
+    final c = context.c;
+    final b = weekBudget(s, _iso);
+    final eaten = _weekMacros(s);
+    final target = macroTargets(s, iso: _iso);
+    if (target == null) return const SizedBox.shrink();
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              KcalRing(
+                eaten: b.spent,
+                target: b.budget,
+                size: 116,
+                label: b.left >= 0 ? t('left') : t('over'),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _line(context, t('Budget'), '${b.budget.round()}'),
+                    _line(context, t('Spent'), '${b.spent.round()}'),
+                    if (b.daysLeft > 0)
+                      _line(
+                        context,
+                        t('{0} days left', b.daysLeft),
+                        '${b.perDayLeft.round()}/${t('day')}',
+                        tint: b.perDayLeft < 0 ? c.sys.orange : c.acc,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(t('Eaten this week'), style: ts(TypeScale.foot, color: c.label2)),
+          const SizedBox(height: 6),
+          MacroLegend(macros: eaten),
+        ],
+      ),
+    );
+  }
+
+  Macros _weekMacros(AppState s) {
+    var kcal = 0.0, p = 0.0, cb = 0.0, f = 0.0;
+    for (final d in weekDays(_iso)) {
+      final t = dayTotals(s, d);
+      kcal += t.kcal;
+      p += t.p;
+      cb += t.c;
+      f += t.f;
+    }
+    return (kcal: kcal, p: p, c: cb, f: f);
   }
 
   Widget _line(BuildContext context, String label, String value, {Color? tint}) {
@@ -215,6 +419,26 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
   Widget _sourcesCard(BuildContext context) => Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Section(children: [
+          Consumer(
+            builder: (context, ref, _) => AppRow(
+              icon: 'sparkles',
+              iconTint: context.c.acc,
+              title: t('Plan my day'),
+              subtitle: t('An example day that hits your target'),
+              accessory: RowAccessory.chevron,
+              onTap: () => dayPlanSheet(ref, iso: _iso),
+            ),
+          ),
+          Consumer(
+            builder: (context, ref, _) => AppRow(
+              icon: 'history',
+              iconTint: context.c.sys.indigo,
+              title: t('Copy a day'),
+              subtitle: t('Most days are a version of one you have already had'),
+              accessory: RowAccessory.chevron,
+              onTap: () => copyDaySheet(ref, to: _iso),
+            ),
+          ),
           AppRow(
             icon: 'fish',
             title: t('Protein sources'),
@@ -348,6 +572,26 @@ class _MealSlot extends ConsumerWidget {
               AppIcon('plus', size: 15, color: c.label3),
             ],
           ),
+          if (m == null || m.items.isEmpty) ...[
+            // An empty slot is where a saved meal is worth the most: it is the moment the user
+            // would otherwise start assembling one food at a time.
+            if (orderedTemplates(ref.watch(appStateProvider)).isNotEmpty) ...[
+              const SizedBox(height: 9),
+              ChipRow(
+                padding: EdgeInsets.zero,
+                children: [
+                  for (final tpl in orderedTemplates(ref.watch(appStateProvider)).take(3))
+                    AppChip(
+                      '${t(tpl.n)} · ${tpl.kcal.round()}',
+                      selected: false,
+                      capitalize: false,
+                      icon: 'plus',
+                      onTap: () => logTemplate(ref, tpl, iso: iso, slot: slot),
+                    ),
+                ],
+              ),
+            ],
+          ],
           if (m != null && m.items.isNotEmpty) ...[
             const SizedBox(height: 9),
             MacroSplit(macros: (kcal: m.kcal, p: m.p, c: m.c, f: m.f), height: 4),
@@ -359,7 +603,7 @@ class _MealSlot extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '${_itemName(item)} · ${item.g.round()} g',
+                        mealItemLabel(item),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: ts(TypeScale.cap, color: c.label2),
@@ -376,14 +620,40 @@ class _MealSlot extends ConsumerWidget {
                   ],
                 ),
               ),
+            if (_repeatCount(ref.watch(appStateProvider), m) case final n? when n >= 3) ...[
+              const SizedBox(height: 6),
+              Pressable(
+                scale: 1,
+                onTap: () => saveMealSheet(ref, m.items, suggestedName: t(name)),
+                child: Row(children: [
+                  AppIcon('star', size: 12, color: c.acc),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      t('Logged this {0} times — save it?', n),
+                      style: ts(TypeScale.cap, color: c.acc),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
           ],
         ],
       ),
     );
   }
 
-  String _itemName(MealItem item) =>
-      item.n ?? (item.fid == null ? t('Food') : t(foods.or(item.fid!).n));
+  /// How many times this exact meal has been logged, if it is worth offering to save.
+  ///
+  /// Null once it is saved, so the offer disappears the moment it is taken rather than
+  /// continuing to ask for something the user has already done.
+  int? _repeatCount(AppState s, Meal m) {
+    final sig = signatureOf(m.items);
+    for (final r in repeatedMeals(s)) {
+      if (r.signature == sig) return r.count;
+    }
+    return null;
+  }
 
   void _remove(WidgetRef ref, Meal m, MealItem item) {
     ref.read(appStateProvider.notifier).update((st) {

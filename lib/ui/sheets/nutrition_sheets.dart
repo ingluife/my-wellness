@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../data/models/app_state.dart';
 import '../../domain/format.dart';
+import '../../domain/coaching.dart';
 import '../../domain/foods.dart';
 import '../../domain/i18n.dart';
 import '../../domain/nutrition.dart';
@@ -11,10 +13,12 @@ import '../../ui/app.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
+import '../widgets/app_icon.dart';
 import '../widgets/controls/app_button.dart';
 import '../widgets/page.dart';
 import '../widgets/controls/fields.dart';
 import '../widgets/controls/select_row.dart';
+import '../widgets/controls/stepper.dart';
 import '../widgets/controls/surfaces.dart';
 import '../widgets/controls/toggles.dart';
 import '../widgets/macro_bar.dart';
@@ -37,12 +41,49 @@ class _BodyProfileSheet extends ConsumerStatefulWidget {
   ConsumerState<_BodyProfileSheet> createState() => _BodyProfileSheetState();
 }
 
+/// The range each body metric is accepted in.
+///
+/// Wide enough not to argue with real people, narrow enough to catch the mistakes that
+/// actually happen — a height typed in metres, an age typed as a birth year. Mifflin-St Jeor
+/// was fitted on adults, so an age below 13 is outside what the equation can honestly answer
+/// rather than merely unusual.
+const _ageRange = (min: 13.0, max: 100.0);
+const _heightRange = (min: 120.0, max: 230.0);
+
 class _BodyProfileSheetState extends ConsumerState<_BodyProfileSheet> {
   double? _age;
   double? _height;
   String? _sex;
   String? _activity;
   bool _seeded = false;
+
+  /// Errors are held back until the field has been left or Save has been pressed, so a
+  /// half-typed "1" on the way to "178" is not shouted at.
+  bool _showErrors = false;
+
+  String? get _ageError {
+    final v = _age;
+    if (v == null) return t('How old are you?');
+    // The ceiling is enforced by the field, so only the floor can be reached from here.
+    if (v < _ageRange.min) {
+      return t('Between {0} and {1}', _ageRange.min.round(), _ageRange.max.round());
+    }
+    return null;
+  }
+
+  String? get _heightError {
+    final v = _height;
+    if (v == null) return t('How tall are you?');
+    if (v < _heightRange.min) {
+      // The mistake this catches most often is metres: 1.78 rather than 178.
+      return v < 3
+          ? t('In centimetres — 178, not 1.78')
+          : t('Between {0} and {1} cm', _heightRange.min.round(), _heightRange.max.round());
+    }
+    return null;
+  }
+
+  bool get _valid => _ageError == null && _heightError == null;
 
   @override
   Widget build(BuildContext context) {
@@ -72,40 +113,56 @@ class _BodyProfileSheetState extends ConsumerState<_BodyProfileSheet> {
         Section(children: [
           AppRow(
             title: t('Age'),
+            subtitle: _showErrors && _ageError != null ? null : t('Years'),
             trailing: SizedBox(
-              width: 76,
-              child: NumberField(
+              width: 92,
+              child: NumberBox(
                 value: _age,
                 decimal: false,
                 nullable: true,
-                onChanged: (v) => _age = v,
+                placeholder: '34',
+                max: _ageRange.max,
+                invalid: _showErrors && _ageError != null,
+                onChanged: (v) => setState(() => _age = v),
               ),
             ),
           ),
+          if (_showErrors && _ageError != null) _error(context, _ageError!),
           AppRow(
             title: t('Height'),
-            subtitle: t('centimetres'),
+            subtitle: _showErrors && _heightError != null ? null : t('Centimetres'),
             trailing: SizedBox(
-              width: 76,
-              child: NumberField(
+              width: 110,
+              child: NumberBox(
                 value: _height,
                 decimal: false,
                 nullable: true,
-                onChanged: (v) => _height = v,
+                placeholder: '178',
+                suffix: t('cm'),
+                max: _heightRange.max,
+                invalid: _showErrors && _heightError != null,
+                onChanged: (v) => setState(() => _height = v),
               ),
             ),
           ),
+          if (_showErrors && _heightError != null) _error(context, _heightError!),
           AppRow(
             title: t('Sex'),
             subtitle: t('Changes the resting-rate formula only'),
-            trailing: Segmented<String>(
-              inline: true,
-              value: _sex ?? 'male',
-              options: [
-                SegOption('male', label: t('Male')),
-                SegOption('female', label: t('Female')),
-              ],
-              onChanged: (v) => setState(() => _sex = v),
+            // Segmented divides its width with Expanded, and AppRow lays its trailing slot
+            // out in an unbounded Row — so it has to be given one. 150 is what every other
+            // in-row segmented control in the app uses.
+            trailing: SizedBox(
+              width: 150,
+              child: Segmented<String>(
+                inline: true,
+                value: _sex ?? 'male',
+                options: [
+                  SegOption('male', label: t('Male')),
+                  SegOption('female', label: t('Female')),
+                ],
+                onChanged: (v) => setState(() => _sex = v),
+              ),
             ),
           ),
         ]),
@@ -129,20 +186,16 @@ class _BodyProfileSheetState extends ConsumerState<_BodyProfileSheet> {
         ),
         const SizedBox(height: 6),
         AppButton(t('Save'), variant: BtnVariant.primary, onTap: () {
-          final age = _age;
-          final height = _height;
-          if (age == null || age < 13 || age > 100) {
-            ref.read(uiProvider).toast(t('Enter an age between 13 and 100'));
-            return;
-          }
-          if (height == null || height < 120 || height > 230) {
-            ref.read(uiProvider).toast(t('Enter a height between 120 and 230 cm'));
+          if (!_valid) {
+            // Both problems at once, marked where they are. A toast names one, disappears,
+            // and leaves you guessing which box it meant.
+            setState(() => _showErrors = true);
             return;
           }
           ref.read(appStateProvider.notifier).update((st) {
             st.nutrition.profile
-              ..age = age
-              ..height = height
+              ..age = _age
+              ..height = _height
               ..sex = _sex ?? 'male'
               ..activity = _activity ?? 'light';
           });
@@ -153,6 +206,18 @@ class _BodyProfileSheetState extends ConsumerState<_BodyProfileSheet> {
     );
   }
 }
+
+/// A validation message, sitting directly under the row it belongs to.
+Widget _error(BuildContext context, String message) => Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 9),
+      child: Row(children: [
+        AppIcon('info', size: 12, color: context.c.sys.red),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(message, style: ts(TypeScale.cap, color: context.c.sys.red)),
+        ),
+      ]),
+    );
 
 /// Cut, maintain or gain, and how fast.
 Future<void> nutritionGoalSheet() =>
@@ -224,9 +289,12 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
               AppRow(
                 title: t('Kilos per week'),
                 trailing: SizedBox(
-                  width: 76,
-                  child: NumberField(
+                  width: 110,
+                  child: NumberBox(
                     value: _rate,
+                    suffix: t('kg'),
+                    // Beyond about a kilo a week the target hits its floor anyway.
+                    max: 3,
                     onChanged: (v) => setState(() => _rate = v ?? 0),
                   ),
                 ),
@@ -234,21 +302,22 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
             ],
           ),
         ],
-        Section(
-          title: t('Meals'),
-          footer: t('Only decides how the day is split up. What you eat in total is what moves the scale.'),
-          children: [
-            AppRow(
-              title: t('Meals per day'),
-              trailing: Segmented<double>(
-                inline: true,
-                value: (_meals ?? 4).clamp(2, 6),
-                options: [for (var i = 2; i <= 6; i++) SegOption(i.toDouble(), label: '$i')],
-                onChanged: (v) => setState(() => _meals = v),
-              ),
-            ),
-          ],
+        SectionTitle(t('Meals')),
+        // Five cells will not fit beside a label — the same reason added weight in the routine
+        // editor is full width rather than squeezed into a row.
+        AppStepper(
+          label: t('Meals per day'),
+          value: (_meals ?? 4).clamp(2, 6),
+          step: 1,
+          decimal: false,
+          onChanged: (v) => setState(() => _meals = (v ?? 4).clamp(2, 6)),
         ),
+        const SizedBox(height: 8),
+        Text(
+          t('Only decides how the day is split up. What you eat in total is what moves the scale.'),
+          style: ts(TypeScale.foot, color: c.label3),
+        ),
+        const SizedBox(height: 18),
         if (target != null) ...[
           AppCard(
             child: Column(
@@ -298,6 +367,89 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
   }
 }
 
+/// The arithmetic behind the number on screen.
+///
+/// A target nobody can take apart is one they can only believe or reject. This is the same
+/// calculation the app already ran, written out — including the part where it overrode the
+/// goal, which is the step most worth seeing.
+Future<void> targetBreakdownSheet({String? iso}) =>
+    showSheet<void>((context, close) => _BreakdownSheet(iso: iso));
+
+class _BreakdownSheet extends ConsumerWidget {
+  const _BreakdownSheet({this.iso});
+
+  final String? iso;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final s = ref.watch(appStateProvider);
+    final steps = targetBreakdown(s, iso: iso);
+    final target = macroTargets(s, iso: iso);
+
+    if (steps.isEmpty || target == null) {
+      return EmptyState(icon: 'info', message: t('Nothing to work out yet'));
+    }
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SheetTitle(t('How this was worked out')),
+          for (final step in steps)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(step.label,
+                            style: ts(TypeScale.body, color: c.label, weight: FontWeight.w500)),
+                        if (step.note != null) ...[
+                          const SizedBox(height: 2),
+                          Text(step.note!, style: ts(TypeScale.cap, color: c.label3)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    // Signed, because a step that takes calories away should look like it.
+                    '${step.value > 0 && step.label != t('Resting') && step.label != t('Maintenance') && step.label != t('Your own number') ? '+' : ''}'
+                    '${step.value.round()}',
+                    style: ts(TypeScale.body,
+                        color: step.value < 0 ? c.sys.orange : c.label,
+                        weight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          Container(height: R.hair, color: c.sep),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: Text(t('Your target'),
+                  style: ts(TypeScale.body, color: c.label, weight: FontWeight.w600)),
+            ),
+            Text('${target.kcal.round()} ${t('kcal')}',
+                style: ts(TypeScale.head, color: c.acc, weight: FontWeight.w600)),
+          ]),
+          const SizedBox(height: 14),
+          Text(
+            t('Every one of these is an estimate. Stats compares what your log predicts against what the scale actually does, which is the only way to find out how close they are for you.'),
+            style: ts(TypeScale.cap, color: c.label3),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
 /// One food: what it is, and how much of it you had.
 Future<void> foodDetailSheet(Food food, {String? iso, double? slot}) =>
     showSheet<void>((context, close) =>
@@ -338,10 +490,13 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
           FoodImage(food: f),
           const SizedBox(height: 12),
           SheetTitle(t(f.n)),
-          Row(
+          // Wrap, not Row: "18.8 g protein / 100 kcal" beside a category tag is wider than a
+          // phone, and a Row would simply overflow rather than move it to a second line.
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
             children: [
               Tag(t(foodCategoryName[f.cat] ?? f.cat), icon: foodCategoryGlyph[f.cat]),
-              const SizedBox(width: 6),
               if (f.p > 0)
                 Tag('${fmtNum(f.proteinDensity)} ${t('g protein / 100 kcal')}',
                     accent: f.proteinDensity >= 10, capitalize: false),
@@ -354,10 +509,12 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
               AppRow(
                 title: t('Grams'),
                 trailing: SizedBox(
-                  width: 88,
-                  child: NumberField(
+                  width: 110,
+                  child: NumberBox(
                     value: _grams,
                     decimal: false,
+                    suffix: t('g'),
+                    max: 5000,
                     onChanged: (v) => setState(() => _grams = v ?? 0),
                   ),
                 ),
@@ -365,7 +522,15 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
             ],
           ),
           ChipRow(children: [
-            for (final g in const [50.0, 100.0, 150.0, 200.0, 250.0])
+            // The food's own household measures come first, because nobody can picture 180 g
+            // of chicken and everybody can picture one breast. Grams stay in the field above
+            // and stay authoritative — this only fills it in.
+            for (final portion in f.portions)
+              AppChip('1 ${t(portion.n)}',
+                  selected: _grams == portion.g,
+                  capitalize: false,
+                  onTap: () => setState(() => _grams = portion.g)),
+            for (final g in const [100.0, 200.0])
               AppChip('${g.round()} g',
                   selected: _grams == g,
                   capitalize: false,
@@ -390,9 +555,36 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
                 MacroSplit(macros: macros),
                 const SizedBox(height: 8),
                 MacroLegend(macros: macros),
+                if (f.fibreIn(_grams) case final fibre? when fibre > 0) ...[
+                  const SizedBox(height: 6),
+                  Text('${t('Fibre')} ${fmtNum(fibre)} g',
+                      style: ts(TypeScale.cap, color: c.label3)),
+                ],
               ],
             ),
           ),
+          if (swapsFor(ref.watch(appStateProvider), f) case final swaps
+              when swaps.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            SecHeading(t('More protein for the same calories')),
+            for (final swap in swaps)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: ListItem(
+                  leading: FoodThumb(food: swap, size: 40),
+                  onTap: () => foodDetailSheet(swap, iso: widget.iso, slot: widget.slot),
+                  trailing: [
+                    Tag('+${fmtNum(swap.p - f.p)}P', accent: true, capitalize: false),
+                  ],
+                  child: ItemText(
+                    t(swap.n),
+                    subtitle: '${swap.kcal.round()} ${t('kcal')} · '
+                        '${fmtNum(swap.p)}P ${t('per 100 g')}',
+                  ),
+                ),
+              ),
+            const SizedBox(height: 6),
+          ],
           if (widget.iso != null) ...[
             AppButton(t('Add to the day'), variant: BtnVariant.primary, onTap: () {
               if (_grams <= 0) {
@@ -430,6 +622,195 @@ void addMealItem(WidgetRef ref, {required String iso, double? slot, required Mea
       items: [item.copy()],
     ));
   });
+}
+
+/// Logs a whole saved meal into a slot in one tap.
+///
+/// Goes through [addMealItem] rather than appending a Meal directly, so slot-merging behaves
+/// exactly as it does for a food added by hand — a template dropped into a slot that already
+/// has something in it joins that meal instead of creating a second one.
+void logTemplate(WidgetRef ref, MealTemplate template,
+    {required String iso, double? slot}) {
+  for (final item in template.items) {
+    addMealItem(ref, iso: iso, slot: slot, item: item);
+  }
+  ref.read(appStateProvider.notifier).update((st) {
+    final saved = st.nutrition.templates.where((x) => x.id == template.id).firstOrNull;
+    if (saved == null) return;
+    saved.used = (saved.used ?? 0) + 1;
+    saved.last = DateTime.now().millisecondsSinceEpoch;
+  });
+}
+
+/// Name a meal and keep it.
+Future<void> saveMealSheet(WidgetRef ref, List<MealItem> items, {String? suggestedName}) =>
+    showSheet<void>((context, close) =>
+        _SaveMealSheet(items: items, suggestedName: suggestedName, close: close));
+
+class _SaveMealSheet extends ConsumerStatefulWidget {
+  const _SaveMealSheet({required this.items, required this.close, this.suggestedName});
+
+  final List<MealItem> items;
+  final String? suggestedName;
+  final void Function([void]) close;
+
+  @override
+  ConsumerState<_SaveMealSheet> createState() => _SaveMealSheetState();
+}
+
+class _SaveMealSheetState extends ConsumerState<_SaveMealSheet> {
+  late final TextEditingController _name =
+      TextEditingController(text: widget.suggestedName ?? '');
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final kcal = widget.items.fold(0.0, (a, i) => a + i.kcal);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SheetTitle(t('Save this meal')),
+        Text(t('Give it a name and it is one tap next time.'),
+            style: ts(TypeScale.foot, color: c.label2)),
+        const SizedBox(height: 12),
+        AppTextField(controller: _name, placeholder: t('Name')),
+        const SizedBox(height: 12),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final i in widget.items)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(children: [
+                    Expanded(
+                      child: Text(mealItemName(i),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ts(TypeScale.cap, color: c.label2)),
+                    ),
+                    Text('${i.kcal.round()}', style: ts(TypeScale.cap, color: c.label3)),
+                  ]),
+                ),
+              const SizedBox(height: 6),
+              Text('${kcal.round()} ${t('kcal')}',
+                  style: ts(TypeScale.foot, color: c.label, weight: FontWeight.w600)),
+            ],
+          ),
+        ),
+        AppButton(t('Save'), variant: BtnVariant.primary, onTap: () {
+          final name = _name.text.trim();
+          if (name.isEmpty) {
+            ref.read(uiProvider).toast(t('Give it a name'));
+            return;
+          }
+          ref.read(appStateProvider.notifier).update((st) {
+            st.nutrition.templates.add(MealTemplate(
+              id: 'mt${uid()}',
+              n: name,
+              items: [for (final i in widget.items) i.copy()],
+              used: 0,
+              last: DateTime.now().millisecondsSinceEpoch,
+            ));
+          });
+          widget.close();
+          ref.read(uiProvider).toast(t('Saved {0}', name));
+        }),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+/// Repeat a day you have already logged.
+///
+/// Most days are a variation on a day you have already had, and re-entering one food at a time
+/// is the friction that ends food logs.
+Future<void> copyDaySheet(WidgetRef ref, {required String to}) =>
+    showSheet<void>((context, close) => _CopyDaySheet(to: to, close: close));
+
+class _CopyDaySheet extends ConsumerWidget {
+  const _CopyDaySheet({required this.to, required this.close});
+
+  final String to;
+  final void Function([void]) close;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(appStateProvider);
+    final days = loggedDays(s, excluding: to);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SheetTitle(t('Copy a day')),
+        if (days.isEmpty)
+          EmptyState(
+            icon: 'calendar',
+            message: t('Nothing to copy yet'),
+            detail: t('Log a day and it becomes a starting point for the next one.'),
+          )
+        else
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final d in days)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: ListItem(
+                      onTap: () {
+                        final meals = mealsOn(s, d);
+                        ref.read(appStateProvider.notifier).update((st) {
+                          for (final m in meals) {
+                            st.meals.add(Meal(
+                              id: 'ml${uid()}',
+                              d: to,
+                              t: DateTime.now().millisecondsSinceEpoch,
+                              slot: m.slot,
+                              items: [for (final i in m.items) i.copy()],
+                            ));
+                          }
+                        });
+                        close();
+                        ref.read(uiProvider).toast(t('Copied {0} meals', meals.length));
+                      },
+                      child: ItemText(
+                        DateFormat('EEEE, d MMM', dateLocale).format(dayOf(d)),
+                        subtitle: '${dayTotals(s, d).kcal.round()} ${t('kcal')} · '
+                            '${mealsOn(s, d).length} ${t('meals')}',
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+/// The display name for a logged item, resolving a catalogue id when it has one.
+String mealItemName(MealItem item) =>
+    item.n ?? (item.fid == null ? t('Food') : t(foods.or(item.fid!).n));
+
+/// The name plus its portion — "Chicken breast · 220 g".
+///
+/// A quick-added item has no weight at all, and "0 g" would read as a bug rather than as the
+/// deliberate absence it is.
+String mealItemLabel(MealItem item) {
+  final name = mealItemName(item);
+  return item.g > 0 ? '$name · ${item.g.round()} g' : name;
 }
 
 /// Search the catalogue and add something to a meal.
@@ -504,10 +885,21 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
           ),
         ),
         const SizedBox(height: 10),
-        AppButton(t('Add your own food'), icon: 'plus', onTap: () {
-          widget.close();
-          customFoodSheet(iso: widget.iso, slot: widget.slot);
-        }),
+        Row(children: [
+          Expanded(
+            child: AppButton(t('Quick add'), icon: 'bolt', onTap: () {
+              widget.close();
+              quickAddSheet(ref, iso: widget.iso, slot: widget.slot);
+            }),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: AppButton(t('Your own food'), icon: 'plus', onTap: () {
+              widget.close();
+              customFoodSheet(iso: widget.iso, slot: widget.slot);
+            }),
+          ),
+        ]),
         const SizedBox(height: 8),
       ],
     );
@@ -535,6 +927,118 @@ class _FoodRow extends StatelessWidget {
               '${t('per 100 g')}',
         ),
       ),
+    );
+  }
+}
+
+/// Calories without a food behind them.
+///
+/// A restaurant meal, someone else's cooking, a guess. There is no honest way to itemise those,
+/// and forcing the attempt is how a day ends up with nothing logged at all — which hurts far
+/// more than a rough number does, because `evolution()` reads an unlogged day as a day nobody
+/// ate on and quietly poisons the comparison the whole feature rests on.
+Future<void> quickAddSheet(WidgetRef ref, {required String iso, double? slot}) =>
+    showSheet<void>((context, close) => _QuickAddSheet(iso: iso, slot: slot, close: close));
+
+class _QuickAddSheet extends ConsumerStatefulWidget {
+  const _QuickAddSheet({required this.iso, required this.close, this.slot});
+
+  final String iso;
+  final double? slot;
+  final void Function([void]) close;
+
+  @override
+  ConsumerState<_QuickAddSheet> createState() => _QuickAddSheetState();
+}
+
+class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
+  final _name = TextEditingController();
+  double? _kcal;
+  double? _p;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SheetTitle(t('Quick add')),
+        Text(
+          t('For a meal you cannot break down. A rough number beats an empty day — a day with nothing logged is read as a day you did not eat.'),
+          style: ts(TypeScale.foot, color: c.label2),
+        ),
+        const SizedBox(height: 12),
+        AppTextField(controller: _name, placeholder: t('What was it? (optional)')),
+        const SizedBox(height: 10),
+        Section(
+          footer: t('Protein is worth guessing at if you can. Everything else can wait.'),
+          children: [
+            AppRow(
+              title: t('Calories'),
+              trailing: SizedBox(
+                width: 120,
+                child: NumberBox(
+                  value: _kcal,
+                  decimal: false,
+                  nullable: true,
+                  placeholder: '600',
+                  suffix: t('kcal'),
+                  max: 10000,
+                  onChanged: (v) => _kcal = v,
+                ),
+              ),
+            ),
+            AppRow(
+              title: t('Protein'),
+              subtitle: t('grams, if you know'),
+              trailing: SizedBox(
+                width: 110,
+                child: NumberBox(
+                  value: _p,
+                  decimal: false,
+                  nullable: true,
+                  suffix: t('g'),
+                  max: 500,
+                  onChanged: (v) => _p = v,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        AppButton(t('Add'), variant: BtnVariant.primary, onTap: () {
+          final kcal = _kcal ?? 0;
+          if (kcal <= 0) {
+            ref.read(uiProvider).toast(t('Enter the calories'));
+            return;
+          }
+          final name = _name.text.trim();
+          addMealItem(
+            ref,
+            iso: widget.iso,
+            slot: widget.slot,
+            item: MealItem(
+              n: name.isEmpty ? t('Quick add') : name,
+              // Grams are unknown and must not be invented: a zero here is honest, and nothing
+              // downstream divides by it.
+              g: 0,
+              kcal: kcal,
+              p: _p ?? 0,
+              c: 0,
+              f: 0,
+            ),
+          );
+          widget.close();
+        }),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }
@@ -608,17 +1112,25 @@ class _CustomFoodSheetState extends ConsumerState<_CustomFoodSheet> {
             onChanged: (v) => setState(() => _cat = v),
           ),
           Section(children: [
+            // Per 100 g, so these are not preferences: 100 g of anything cannot hold more than
+            // 100 g of one macro, and pure fat is about 900 kcal.
             for (final row in [
-              (t('Calories'), _kcal, (double? v) => _kcal = v),
-              (t('Protein'), _p, (double? v) => _p = v),
-              (t('Carbs'), _c, (double? v) => _c = v),
-              (t('Fat'), _f, (double? v) => _f = v),
+              (t('Calories'), _kcal, (double? v) => _kcal = v, t('kcal'), 900.0),
+              (t('Protein'), _p, (double? v) => _p = v, t('g'), 100.0),
+              (t('Carbs'), _c, (double? v) => _c = v, t('g'), 100.0),
+              (t('Fat'), _f, (double? v) => _f = v, t('g'), 100.0),
             ])
               AppRow(
                 title: row.$1,
                 trailing: SizedBox(
-                  width: 80,
-                  child: NumberField(value: row.$2, nullable: true, onChanged: row.$3),
+                  width: 110,
+                  child: NumberBox(
+                    value: row.$2,
+                    nullable: true,
+                    suffix: row.$4,
+                    max: row.$5,
+                    onChanged: row.$3,
+                  ),
                 ),
               ),
           ]),

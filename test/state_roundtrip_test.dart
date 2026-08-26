@@ -137,13 +137,49 @@ void main() {
       expect(s.meals.first.p, closeTo(46.9, 1e-9));
     });
 
+    test('saved meals and a dismissed suggestion round-trip too', () {
+      final s = AppState.fromJson(withNutrition);
+      expect(s.nutrition.templates, hasLength(2));
+      expect(s.nutrition.templates.first.n, 'Usual breakfast');
+      expect(s.nutrition.templates.first.used, 12);
+      // The second was saved and never used: absent counts stay absent, not zeroed.
+      expect(s.nutrition.templates[1].used, isNull);
+      expect(s.nutrition.templates[1].toJson().containsKey('used'), isFalse);
+      expect(s.nutrition.dismissedAdj, 1741000000000);
+    });
+
+    test('saving a meal is enough to start writing the key, and clearing it stops', () {
+      final s = AppState.defaults();
+      expect(s.toJson().containsKey('nutrition'), isFalse);
+
+      s.nutrition.templates.add(MealTemplate(id: 'mt1', n: 'x'));
+      expect(s.toJson()['nutrition'], {
+        'templates': [
+          {'id': 'mt1', 'n': 'x', 'items': <dynamic>[]},
+        ],
+      });
+
+      s.nutrition.templates.clear();
+      expect(s.toJson().containsKey('nutrition'), isFalse);
+    });
+
+    test('turning down a suggestion is on its own enough to persist', () {
+      // It has to be: a dismissal that vanished on restart would mean the same suggestion
+      // came back every time the app opened.
+      final s = AppState.defaults();
+      s.nutrition.dismissedAdj = 1741000000000;
+      expect(s.toJson()['nutrition'], {'dismissedAdj': 1741000000000});
+    });
+
     test('the deep clone reaches into meals', () {
       final s = AppState.fromJson(withNutrition);
       final clone = s.copy();
       clone.meals.first.items.first.kcal = 999;
       clone.nutrition.profile.age = 99;
+      clone.nutrition.templates.first.items.first.kcal = 999;
       expect(s.meals.first.items.first.kcal, 216);
       expect(s.nutrition.profile.age, 34);
+      expect(s.nutrition.templates.first.items.first.kcal, 215);
     });
   });
 }

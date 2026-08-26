@@ -367,6 +367,114 @@ List<(String, double)> mealSplit(NutritionGoal g) {
   return [for (var i = 0; i < n; i++) (t('Meal {0}', i + 1), 1 / n)];
 }
 
+/// A week's calorie budget, and what is left of it.
+typedef WeekBudget = ({
+  double budget,
+  double spent,
+  double left,
+  int daysLeft,
+  double perDayLeft,
+});
+
+/// The week containing [iso], priced day by day.
+///
+/// Energy balance is weekly, not daily, and a daily-only frame turns one heavy Saturday into a
+/// failure rather than into something Tuesday already paid for. The budget is summed from each
+/// day's own target, so a week with three training days in it is worth more than a week with
+/// one — the link back to the plan is preserved rather than averaged away.
+///
+/// [daysLeft] counts today as still spendable: at breakfast on Wednesday there are five days
+/// left in the week, not four.
+WeekBudget weekBudget(AppState s, String iso) {
+  final days = weekDays(iso);
+  final today = todayISO();
+
+  var budget = 0.0;
+  var spent = 0.0;
+  var daysLeft = 0;
+
+  for (final d in days) {
+    budget += macroTargets(s, iso: d)?.kcal ?? 0;
+    // A future day has not been eaten yet even if something is logged against it, and a past
+    // day is settled whether or not anything was.
+    if (d.compareTo(today) <= 0) {
+      spent += dayTotals(s, d).kcal;
+    }
+    if (d.compareTo(today) >= 0) daysLeft++;
+  }
+
+  final left = budget - spent;
+  return (
+    budget: budget,
+    spent: spent,
+    left: left,
+    daysLeft: daysLeft,
+    // What is left, spread over what remains — the number that actually guides a decision.
+    // Past the end of the week there is nothing left to spread it over.
+    perDayLeft: daysLeft > 0 ? left / daysLeft : 0,
+  );
+}
+
+/// A stable key for "the same meal, logged again".
+///
+/// Built from what was eaten and how much of it, so a breakfast repeated on Tuesday matches
+/// Monday's. Names are ignored where a food id exists — the same food typed by hand and picked
+/// from the catalogue are the same breakfast. Grams are rounded to five so a 148 g and a 150 g
+/// chicken breast do not read as two different meals; nobody weighs that precisely and the
+/// difference is well inside the error the rest of this file already carries.
+String signatureOf(Iterable<MealItem> items) {
+  final parts = [
+    for (final i in items)
+      '${i.fid ?? i.n ?? ''}:${(i.g / 5).round() * 5}'
+  ]..sort();
+  return parts.join('|');
+}
+
+/// Meals logged the same way at least [min] times that are not saved yet.
+///
+/// The evidence behind offering to save one. Nothing is saved automatically: a suggestion the
+/// user accepts is a meal they will use, and one the app invents is clutter they have to delete.
+List<({String signature, Meal example, int count})> repeatedMeals(AppState s, {int min = 3}) {
+  final saved = {for (final x in s.nutrition.templates) signatureOf(x.items)};
+  final counts = <String, int>{};
+  final example = <String, Meal>{};
+  for (final m in s.meals) {
+    if (m.items.isEmpty) continue;
+    final sig = signatureOf(m.items);
+    if (saved.contains(sig)) continue;
+    counts[sig] = (counts[sig] ?? 0) + 1;
+    example[sig] ??= m;
+  }
+  final out = [
+    for (final e in counts.entries)
+      if (e.value >= min) (signature: e.key, example: example[e.key]!, count: e.value)
+  ]..sort((a, b) => b.count.compareTo(a.count));
+  return out;
+}
+
+/// Saved meals, most useful first: what gets logged often and recently.
+///
+/// Frequency ahead of recency, because a breakfast eaten every weekday should outrank the
+/// dinner you happened to have last night.
+List<MealTemplate> orderedTemplates(AppState s) {
+  final out = [...s.nutrition.templates];
+  out.sort((a, b) {
+    final byUse = (b.used ?? 0).compareTo(a.used ?? 0);
+    return byUse != 0 ? byUse : (b.last ?? 0).compareTo(a.last ?? 0);
+  });
+  return out;
+}
+
+/// Days that have food logged against them, most recent first.
+List<String> loggedDays(AppState s, {int take = 14, String? excluding}) {
+  final days = <String>{
+    for (final m in s.meals)
+      if (m.items.isNotEmpty && m.d != excluding) m.d
+  }.toList()
+    ..sort((a, b) => b.compareTo(a));
+  return days.take(take).toList();
+}
+
 /// What the log predicted against what the scale did.
 ///
 /// [predicted] is the weight change the logged energy balance implies; [observed] is what the
