@@ -78,27 +78,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final eaten = dayTotals(s, iso);
     final dayTarget = macroTargets(s, iso: iso) ?? target;
 
+    // One point per day that has any food on it, over the last two weeks — a glance at trend
+    // rather than the full history Stats already shows.
+    final days = <String>{for (final m in s.meals) m.d}.toList()..sort();
+    final cutoff = DateTime.now().subtract(const Duration(days: 14));
+    final points = <ChartPoint>[
+      for (final d in days)
+        if (!dayOf(d).isBefore(cutoff))
+          ChartPoint(t: dayOf(d).millisecondsSinceEpoch, y: dayTotals(s, d).kcal, d: d),
+    ];
+
     return AppCard(
-      onTap: () => context.go('/nutrition'),
+      // The chart below has its own gesture detector for its hover tooltip, so only the header
+      // — not the whole card — navigates. A card-wide onTap around a LineChart would put the
+      // two gestures in the same arena for no good reason.
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(t('Today\'s food'),
-                    style: ts(TypeScale.foot, color: c.label2)),
-              ),
-              Text(
-                '${eaten.kcal.round()} / ${dayTarget.kcal.round()} ${t('kcal')}',
-                style: ts(TypeScale.foot, color: c.label, weight: FontWeight.w600),
-              ),
-              const SizedBox(width: 6),
-              AppIcon('chevronRight', size: 14, color: c.label3),
-            ],
+          Pressable(
+            scale: 1,
+            onTap: () => context.go('/nutrition'),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(t('Today\'s food'),
+                      style: ts(TypeScale.foot, color: c.label2)),
+                ),
+                Text(
+                  '${eaten.kcal.round()} / ${dayTarget.kcal.round()} ${t('kcal')}',
+                  style: ts(TypeScale.foot, color: c.label, weight: FontWeight.w600),
+                ),
+                const SizedBox(width: 6),
+                AppIcon('chevronRight', size: 14, color: c.label3),
+              ],
+            ),
           ),
           const SizedBox(height: 10),
           MacroBars(eaten: eaten, target: dayTarget, compact: true),
+          if (points.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            LineChart(points: points, height: 90, unit: t('kcal'), goal: dayTarget.kcal),
+          ],
         ],
       ),
     );

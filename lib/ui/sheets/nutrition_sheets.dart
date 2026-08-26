@@ -451,9 +451,15 @@ class _BreakdownSheet extends ConsumerWidget {
 }
 
 /// One food: what it is, and how much of it you had.
-Future<void> foodDetailSheet(Food food, {String? iso, double? slot}) =>
-    showSheet<void>((context, close) =>
-        _FoodDetailSheet(food: food, iso: iso, slot: slot, close: close));
+///
+/// [initialGrams] seeds the portion field — used when the food arrives with a quantity already
+/// attached, such as a suggested day plan's proposed portion. [onLogged] fires right after "Add
+/// to the day" actually writes the item, so a caller showing its own pending/logged state (the
+/// day plan sheet) can update without this sheet knowing anything about that state itself.
+Future<void> foodDetailSheet(Food food,
+        {String? iso, double? slot, double? initialGrams, VoidCallback? onLogged}) =>
+    showSheet<void>((context, close) => _FoodDetailSheet(
+        food: food, iso: iso, slot: slot, initialGrams: initialGrams, onLogged: onLogged, close: close));
 
 class _FoodDetailSheet extends ConsumerStatefulWidget {
   const _FoodDetailSheet({
@@ -461,11 +467,15 @@ class _FoodDetailSheet extends ConsumerStatefulWidget {
     required this.close,
     this.iso,
     this.slot,
+    this.initialGrams,
+    this.onLogged,
   });
 
   final Food food;
   final String? iso;
   final double? slot;
+  final double? initialGrams;
+  final VoidCallback? onLogged;
   final void Function([void]) close;
 
   @override
@@ -474,6 +484,12 @@ class _FoodDetailSheet extends ConsumerStatefulWidget {
 
 class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
   double _grams = 100;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialGrams != null) _grams = widget.initialGrams!;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -592,6 +608,7 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
                 return;
               }
               addMealItem(ref, iso: widget.iso!, slot: widget.slot, item: item);
+              widget.onLogged?.call();
               widget.close();
               ref.read(uiProvider).toast(t('Added {0}', t(f.n)));
             }),

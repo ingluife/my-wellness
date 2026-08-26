@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../domain/foods.dart';
 import '../../domain/format.dart';
@@ -66,6 +67,7 @@ class _FoodLibraryScreenState extends ConsumerState<FoodLibraryScreen> {
         PageHeader(
           title: t('Foods'),
           subtitle: t('{0} foods', list.length),
+          leading: IconButtonRound('chevronLeft', onTap: () => context.go('/nutrition')),
         ),
         SearchField(
           value: _q,

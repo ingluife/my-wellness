@@ -548,6 +548,9 @@ class _WorkoutDetail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     final s = ref.watch(appStateProvider);
+    // The workout's own weigh-in when it has one — this is a look back at a session that may be
+    // weeks old, so the live body weight would be the wrong number to cost it at.
+    final kg = workout.bw != null ? kgOf(workout.bw!, s.unit) : bodyKg(s);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -563,6 +566,15 @@ class _WorkoutDetail extends ConsumerWidget {
           style: ts(TypeScale.foot, color: c.label2),
         ),
         const SizedBox(height: 12),
+        StatTiles(tiles: [
+          (label: t('Duration'), value: fmtDur(workout.end - workout.start), color: null),
+          (label: t('Volume'), value: fmtVol(workout.vol, s.unit), color: null),
+          (label: t('Sets'), value: '${setsDone(workout)}', color: null),
+          if (kg != null)
+            (label: t('Burned'), value: '${workoutBurn(workout, kg).round()} ${t('kcal')}', color: null)
+          else
+            (label: t('PRs'), value: workout.prs.isEmpty ? '—' : '${workout.prs.length}', color: null),
+        ]),
         for (final e in workout.entries)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),

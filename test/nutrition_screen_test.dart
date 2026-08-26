@@ -252,8 +252,7 @@ void main() {
       final container = await pump(tester, profiled(), '/nutrition');
       await openPlan(tester);
 
-      await tester.tap(find.text('Log this meal').first);
-      await tester.pumpAndSettle();
+      await press(tester, find.text('Log this meal').first);
 
       final meals = container.read(appStateProvider).meals;
       expect(meals, hasLength(1));
