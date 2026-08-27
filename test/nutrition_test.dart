@@ -507,6 +507,60 @@ void main() {
       expect(repeatedMeals(s), isEmpty);
     });
 
+    test('a recipe that makes several portions prices one of them', () {
+      // What separates a recipe from a saved meal. A pot of stew is written down once, as the
+      // pot; everything that reads it — the list, the log, the day plan — wants a bowl.
+      final stew = MealTemplate(
+        id: 'mt1',
+        n: 'Stew',
+        servings: 4,
+        items: [it('f0010', 800), it('f0107', 600)],
+      );
+      expect(stew.batchKcal, closeTo(stew.kcal * 4, 0.01));
+      expect(stew.portion(), hasLength(2));
+      expect(stew.portion().first.g, 200);
+      expect(stew.portion().first.kcal, closeTo(stew.items.first.kcal / 4, 0.01));
+    });
+
+    test('a recipe with no servings set is one portion, not a crash', () {
+      // `servings` is nullable so a recipe nobody batch-cooks stays out of the export, which
+      // means every reader has to cope with its absence.
+      final one = MealTemplate(id: 'mt1', n: 'Toast', items: [it('f0114', 60)]);
+      expect(one.servings, isNull);
+      expect(one.perServing, 1);
+      expect(one.kcal, closeTo(one.batchKcal, 0.01));
+      expect(one.toJson().containsKey('servings'), isFalse);
+      expect(one.toJson().containsKey('slot'), isFalse);
+    });
+
+    test('a batch recipe already saved is never offered back as a repeat', () {
+      // The signature has to be taken over a *portion*, or a four-serving stew is offered as
+      // something to save again every time a bowl of it is logged.
+      final s = profiled();
+      for (var i = 0; i < 4; i++) {
+        s.meals.add(meal(daysAgo(i), [it('f0010', 200)]));
+      }
+      s.nutrition.templates.add(MealTemplate(
+        id: 'mt1',
+        n: 'Batch',
+        servings: 4,
+        items: [it('f0010', 800)],
+      ));
+      expect(repeatedMeals(s), isEmpty);
+    });
+
+    test('a recipe filed under a meal keeps that filing across a change of meal count', () {
+      // `MealTemplate.slot` is a name and not the numeric index `Meal.slot` carries, because
+      // index 2 is a snack under a four-meal day and lunch under a six-meal one.
+      final s = profiled();
+      s.nutrition.templates.add(MealTemplate(id: 'mt1', n: 'Usual', slot: 'Breakfast'));
+      s.nutrition.goal.meals = 4;
+      final under4 = s.nutrition.templates.first.slot;
+      s.nutrition.goal.meals = 6;
+      expect(s.nutrition.templates.first.slot, under4);
+      expect(under4, 'Breakfast');
+    });
+
     test('saved meals are ordered by use, then by recency', () {
       final s = profiled();
       s.nutrition.templates.addAll([

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:my_open_gym/data/ai/ai_key_store.dart';
 import 'package:my_open_gym/data/models/app_state.dart';
 
 /// The single most important test in the project.
@@ -105,6 +106,28 @@ void main() {
       expect(out.containsKey('meals'), isFalse);
     });
 
+    test('a meal logged by hand carries no photo key', () {
+      // `photo` is a fourth key openGym has no default for, under the same absent-until-used
+      // contract as the three above it — and most meals are logged by hand, so most meals must
+      // serialise exactly as they did before the field existed.
+      final s = AppState.defaults();
+      s.meals.add(Meal(
+        id: 'ml1',
+        d: '2026-08-27',
+        items: [MealItem(n: 'Toast', g: 40, kcal: 100, p: 3, c: 20, f: 1)],
+      ));
+      expect((s.toJson()['meals'] as List).single, isNot(contains('photo')));
+
+      s.meals.single.photo = 'mpabc123.jpg';
+      final out = AppState.fromJson(s.toJson());
+      expect(out.meals.single.photo, 'mpabc123.jpg');
+      // ...and it deep-clones, so the boot sweep clearing it on a draft cannot reach back into
+      // the state the UI is still reading.
+      final clone = out.copy();
+      clone.meals.single.photo = null;
+      expect(out.meals.single.photo, 'mpabc123.jpg');
+    });
+
     test('setting one field is enough to start writing the key', () {
       final s = AppState.defaults();
       s.nutrition.profile.age = 34;
@@ -180,6 +203,102 @@ void main() {
       expect(s.meals.first.items.first.kcal, 216);
       expect(s.nutrition.profile.age, 34);
       expect(s.nutrition.templates.first.items.first.kcal, 215);
+    });
+  });
+
+  // `ai` is the third key openGym has no default for, under the same contract as nutrition and
+  // meals. The tests below are the nutrition ones again, plus one that has nothing to do with the
+  // round trip and everything to do with what must never be in it.
+  group('ai', () {
+    test('an untouched profile writes no ai key', () {
+      expect(AppState.defaults().toJson().containsKey('ai'), isFalse);
+    });
+
+    test('the openGym fixture still writes none', () {
+      // The guard that matters: reading a backup from openGym and exporting it again must not
+      // grow a key that was never there.
+      final out = AppState.fromJson(source).toJson();
+      expect(out.containsKey('ai'), isFalse);
+    });
+
+    test('merely looking at a feature does not start writing the key', () {
+      // `feature()` creates on demand so callers can write to it directly. That is only safe
+      // while a fresh config is indistinguishable from no config at all.
+      final s = AppState.defaults();
+      s.ai.feature(aiMealPhoto);
+      expect(s.toJson().containsKey('ai'), isFalse);
+    });
+
+    test('turning the feature on is enough to start writing it, and off again drops it', () {
+      final s = AppState.defaults();
+      s.ai.feature(aiMealPhoto).on = true;
+      expect(s.toJson()['ai'], {
+        'mealPhoto': {'on': true},
+      });
+
+      s.ai.feature(aiMealPhoto).on = null;
+      expect(s.toJson().containsKey('ai'), isFalse);
+    });
+
+    test('a choice that happens to match the default is still recorded', () {
+      // Mirrors `effort` and the nutrition goal: null means never chose, so an explicit "off"
+      // has to survive even though off is what the app would have assumed anyway.
+      final s = AppState.defaults();
+      s.ai.feature(aiMealPhoto).on = false;
+      expect(s.toJson()['ai'], {
+        'mealPhoto': {'on': false},
+      });
+    });
+
+    test('a feature key from a newer build is carried through untouched', () {
+      final j = {...source, 'ai': {'mealPhoto': {'on': true}, 'mealChat': {'provider': 'x'}}};
+      final out = AppState.fromJson(j).toJson();
+      expect(out['ai'], {
+        'mealPhoto': {'on': true},
+        'mealChat': {'provider': 'x'},
+      });
+    });
+
+    test('keeping photos is only written once it is turned off', () {
+      // The one field here that defaults to yes, so an untouched profile must still write nothing
+      // and a deliberate "no" must survive a round trip rather than being read back as never
+      // chosen — which is exactly how the setting would fail to stay off.
+      final s = AppState.defaults();
+      expect(s.ai.feature(aiMealPhoto).keepsPhotos, isTrue);
+      expect(s.toJson().containsKey('ai'), isFalse);
+
+      s.ai.feature(aiMealPhoto).keepPhotos = false;
+      expect(s.toJson()['ai'], {
+        'mealPhoto': {'keepPhotos': false},
+      });
+      expect(AppState.fromJson(s.toJson()).ai.feature(aiMealPhoto).keepsPhotos, isFalse);
+    });
+
+    test('the deep clone reaches into ai settings', () {
+      final s = AppState.defaults();
+      s.ai.feature(aiMealPhoto).model = 'claude-opus-5';
+      final clone = s.copy();
+      clone.ai.feature(aiMealPhoto).model = 'something-else';
+      expect(s.ai.feature(aiMealPhoto).model, 'claude-opus-5');
+    });
+
+    test('no API key can reach the exported state', () async {
+      // This cannot fail today: AiSettings has nowhere to put a key, which is the entire design.
+      // It is written down so that the next person who adds a "convenience" field to it trips
+      // over the reason rather than rediscovering it after a backup has been emailed around.
+      const sentinel = 'sk-ant-SENTINEL-must-never-be-serialised';
+      final store = MemoryAiKeyStore();
+      await store.write('anthropic', sentinel);
+
+      final s = AppState.defaults();
+      s.ai.feature(aiMealPhoto)
+        ..on = true
+        ..provider = 'anthropic'
+        ..model = 'claude-opus-5';
+
+      expect(await store.read('anthropic'), sentinel);
+      expect(jsonEncode(s.toJson()), isNot(contains(sentinel)));
+      expect(jsonEncode(s.toJson()), isNot(contains('sk-ant')));
     });
   });
 }

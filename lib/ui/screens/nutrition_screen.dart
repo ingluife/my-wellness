@@ -9,9 +9,11 @@ import '../../domain/format.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
 import '../../domain/nutrition.dart';
+import '../../state/ai_provider.dart';
 import '../../state/app_state_provider.dart';
 import '../app.dart';
 import '../sheets/day_plan_sheet.dart';
+import '../sheets/meal_photo_sheet.dart';
 import '../sheets/nutrition_sheets.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -419,6 +421,25 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
   Widget _sourcesCard(BuildContext context) => Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Section(children: [
+          // The discovery path, and honest about being off: a row that says "set this up" is
+          // better than a feature nobody finds, and better than a button that does nothing.
+          Consumer(
+            builder: (context, ref, _) {
+              final on = ref.watch(aiMealPhotoProvider).isAvailable;
+              return AppRow(
+                icon: 'sparkles',
+                iconTint: context.c.sys.purple,
+                title: on ? t('Log from a photo') : t('Set up meal photos'),
+                subtitle: on
+                    ? t('Photograph a plate and check what the app makes of it')
+                    : t('Use your own AI provider to draft a meal from a photo'),
+                accessory: RowAccessory.chevron,
+                onTap: () => on
+                    ? mealPhotoSheet(ref, iso: _iso)
+                    : context.go('/settings/ai'),
+              );
+            },
+          ),
           Consumer(
             builder: (context, ref, _) => AppRow(
               icon: 'sparkles',
@@ -427,6 +448,19 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
               subtitle: t('An example day that hits your target'),
               accessory: RowAccessory.chevron,
               onTap: () => dayPlanSheet(ref, iso: _iso),
+            ),
+          ),
+          Consumer(
+            builder: (context, ref, _) => AppRow(
+              icon: 'meal',
+              iconTint: context.c.sys.green,
+              title: t('Recipes'),
+              subtitle: orderedTemplates(ref.watch(appStateProvider)).isEmpty
+                  ? t('Write down what you cook, once')
+                  : t('{0} saved · one tap to log',
+                      orderedTemplates(ref.watch(appStateProvider)).length),
+              accessory: RowAccessory.chevron,
+              onTap: () => context.go('/nutrition/recipes'),
             ),
           ),
           Consumer(
@@ -569,6 +603,19 @@ class _MealSlot extends ConsumerWidget {
                 style: ts(TypeScale.foot, color: c.label2),
               ),
               const SizedBox(width: 6),
+              // The photo affordance sits exactly where the user already taps to log this meal,
+              // and carries the slot with it. Absent — not disabled — when the feature is off,
+              // so a build with no key looks like the app always did.
+              if (ref.watch(aiMealPhotoProvider).isAvailable) ...[
+                Pressable(
+                  onTap: () => mealPhotoSheet(ref, iso: iso, slot: slot),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: AppIcon('sparkles', size: 15, color: c.label3),
+                  ),
+                ),
+                const SizedBox(width: 2),
+              ],
               AppIcon('plus', size: 15, color: c.label3),
             ],
           ),
@@ -596,35 +643,30 @@ class _MealSlot extends ConsumerWidget {
             const SizedBox(height: 9),
             MacroSplit(macros: (kcal: m.kcal, p: m.p, c: m.c, f: m.f), height: 4),
             const SizedBox(height: 8),
-            for (final item in m.items)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        mealItemLabel(item),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: ts(TypeScale.cap, color: c.label2),
-                      ),
+            // The picture and the list it produced, side by side. Only when there is one — most
+            // meals are logged by hand and the card has to look untouched for them.
+            if (m.photo case final photo?)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _MealPhoto(name: photo),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [for (final item in m.items) _itemLine(context, ref, m, item)],
                     ),
-                    Text('${item.kcal.round()}',
-                        style: ts(TypeScale.cap, color: c.label3)),
-                    const SizedBox(width: 6),
-                    Pressable(
-                      scale: .9,
-                      onTap: () => _remove(ref, m, item),
-                      child: AppIcon('xmark', size: 12, color: c.label4),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                ],
+              )
+            else
+              for (final item in m.items) _itemLine(context, ref, m, item),
             if (_repeatCount(ref.watch(appStateProvider), m) case final n? when n >= 3) ...[
               const SizedBox(height: 6),
               Pressable(
                 scale: 1,
-                onTap: () => saveMealSheet(ref, m.items, suggestedName: t(name)),
+                // The slot goes across untranslated: it is stored and matched on, while the
+                // name is only ever read.
+                onTap: () => saveMealSheet(ref, m.items, suggestedName: t(name), slot: name),
                 child: Row(children: [
                   AppIcon('star', size: 12, color: c.acc),
                   const SizedBox(width: 5),
@@ -638,6 +680,32 @@ class _MealSlot extends ConsumerWidget {
               ),
             ],
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _itemLine(BuildContext context, WidgetRef ref, Meal m, MealItem item) {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              mealItemLabel(item),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ts(TypeScale.cap, color: c.label2),
+            ),
+          ),
+          Text('${item.kcal.round()}', style: ts(TypeScale.cap, color: c.label3)),
+          const SizedBox(width: 6),
+          Pressable(
+            scale: .9,
+            onTap: () => _remove(ref, m, item),
+            child: AppIcon('xmark', size: 12, color: c.label4),
+          ),
         ],
       ),
     );
@@ -662,8 +730,47 @@ class _MealSlot extends ConsumerWidget {
       final i = meal.items.indexWhere((x) =>
           x.fid == item.fid && x.g == item.g && x.kcal == item.kcal && x.n == item.n);
       if (i >= 0) meal.items.removeAt(i);
-      // An empty meal is not a meal.
+      // An empty meal is not a meal. Its photograph goes with it — not here, but at the next boot
+      // sweep, which is where every "this file has nothing pointing at it" decision is made.
       if (meal.items.isEmpty) st.meals.removeWhere((x) => x.id == meal.id);
     });
+  }
+}
+
+/// The photograph a meal was drafted from, if it is still on the phone.
+///
+/// Every branch here except one renders nothing at all, and that is the normal case rather than an
+/// error path: the file is not in a backup, it is deleted after 90 days, and the user can switch
+/// keeping them off entirely. A meal whose picture has gone is a meal, and the card is complete
+/// without it — so an absent photo collapses silently instead of leaving a placeholder behind.
+class _MealPhoto extends ConsumerWidget {
+  const _MealPhoto({required this.name});
+
+  final String name;
+
+  static const _size = 46.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytes = ref.watch(mealPhotoProvider(name)).value;
+    if (bytes == null) return const SizedBox.shrink();
+    // The gap belongs to the picture, so a meal whose file has gone leaves the list flush against
+    // the card edge exactly as an unphotographed one does.
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(9),
+        child: Image.memory(
+          bytes,
+          width: _size,
+          height: _size,
+          fit: BoxFit.cover,
+          // Image.memory throws asynchronously on bytes it cannot decode, and an uncaught throw
+          // out of the image service takes the whole day view down — over a thumbnail. FoodThumb
+          // sets the same precedent.
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      ),
+    );
   }
 }

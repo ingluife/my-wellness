@@ -6,7 +6,7 @@
 #
 # `fdcId` is the USDA FoodData Central record the numbers come from (SR Legacy, public domain).
 # `name` is the display string and doubles as its i18n key. `cat` is one of
-# protein | dairy | carb | veg | fruit | fat | drink.
+# protein | dairy | carb | veg | fruit | fat | drink | other.
 #
 # The last field is the USDA description the id resolves to, kept so a wrong match is visible
 # in review rather than only in the app. gen_foods.mjs ignores it.
@@ -44,7 +44,7 @@ f0025	167902	Ground pork	protein	Pork, fresh, ground, raw
 f0026	171505	Ground turkey	protein	Turkey, Ground, raw
 f0027	171964	Haddock	protein	Fish, haddock, raw
 f0028	171965	Halibut	protein	Fish, halibut, Greenland, raw
-f0029	172108	Ham	protein	LEAN POCKETS, Ham N Cheddar
+f0029	167872	Ham	protein	Pork, cured, ham, boneless, regular (approximately 11% fat), roasted
 f0030	172454	Hummus	fat	Hummus, home prepared
 f0031	173792	Kidney beans	protein	Beans, kidney, all types, mature seeds, cooked, boiled, with salt
 f0032	172491	Lamb chop	protein	Lamb, loin, separable lean only, trimmed to 1/4" fat, choice, raw
@@ -242,3 +242,14 @@ f0223	171917	Green tea	drink	Beverages, tea, green, brewed, regular
 f0224	169098	Orange juice	drink	Orange juice, raw (Includes foods for USDA's Food Distribution Program)
 f0225	173190	Red wine	drink	Alcoholic beverage, wine, table, red
 f0226	175215	Soy milk	drink	Soymilk (all flavors), unsweetened, with added calcium, vitamins A and D
+f0227	169640	Honey	carb	Honey
+f0228	169641	Jam	carb	Jams and preserves
+f0229	170054	Tomato sauce	veg	Tomato products, canned, sauce
+f0230	174277	Soy sauce	other	Soy sauce made from soy and wheat (shoyu)
+f0231	170273	Dark chocolate	fat	Chocolate, dark, 70-85% cacao solids
+f0232	173859	Chorizo	protein	Sausage, pork, chorizo, link or ground, raw
+f0233	174524	Salsa	veg	Sauce, salsa, ready-to-serve
+f0234	172442	Miso	other	Miso
+f0235	168914	Rice noodles	carb	Rice noodles, cooked
+f0236	172952	Italian sausage	protein	Sausage, Italian, sweet, links
+f0237	170051	Canned tomatoes	veg	Tomatoes, red, ripe, canned, packed in tomato juice

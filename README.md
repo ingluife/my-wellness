@@ -16,6 +16,16 @@ training log lives on the phone, in the app's private storage, and goes out thro
 sheet when you back it up. The self-hosted flavour's passkey sign-in, cross-device sync and admin
 dashboard are not part of this build — see *Firebase* below for where that goes.
 
+**One thing can leave the phone, and only if you set it up.** Nutrition can draft a meal from a
+photograph, using an API key *you* enter for a provider *you* pick (Anthropic, Google or OpenAI).
+It is off until you turn it on, the photo goes straight from your phone to that provider on your
+own account, and you check every number before anything is logged. This app still runs no server
+of its own and still collects nothing. Keys are kept in the phone keychain and are never in your
+backup file; meal photos are kept on the phone for 90 days and are not in a backup either.
+Settings → AI features has a **Test** per provider: it sends one 64-pixel request down the real
+path, so a key that has been revoked or a model the provider has retired says so there rather than
+the next time you photograph a plate. It is a real inference call and costs a fraction of a cent.
+
 | | |
 |---|---|
 | **Screens** | Home · Plan · Routine editor · Workout · Stats · History · Exercises · Settings · Login |
@@ -54,18 +64,19 @@ node tool/gen_tones.mjs         # assets/audio/*.wav             (the timer beep
 The nutrition feature has no upstream in openGym, so its data comes from public sources instead:
 
 ```sh
-node tool/gen_foods.mjs         # assets/data/foods.json         (226 foods, USDA FoodData Central)
+node tool/gen_foods.mjs         # assets/data/foods.json         (237 foods, USDA FoodData Central)
                                 #                                 + household portions and fibre
+node tool/gen_dishes.mjs        # assets/data/dishes.json        (60 dishes, composed of those foods)
 node tool/fetch_food_media.mjs  # tool/food_media.tsv            (resolves a CC0 photo per food)
 ./tool/sync_food_media.sh       # assets/food                    (downloads and crops them)
 node tool/check_i18n_nutrition.mjs   # validates tool/locales_nutrition/*.js before a regen
 ```
 
-Its **strings** have no upstream either, so they live in `tool/locales_nutrition/<lang>.js` — 562
+Its **strings** have no upstream either, so they live in `tool/locales_nutrition/<lang>.js` — 677
 keys per language, covering the screens and coaching copy, the meal slots, the food categories,
-and the food and portion names the catalogue is written in. `gen_i18n.mjs` merges them over
-openGym's pack for each language, which is the only reason a re-run does not wipe them; edit the
-overlay, never `assets/i18n/*.json`.
+the food and portion names the catalogue is written in, and the dish names. `gen_i18n.mjs` merges
+them over openGym's pack for each language, which is the only reason a re-run does not wipe them;
+edit the overlay, never `assets/i18n/*.json`.
 
 `tool/nutrition_keys.json` is the English key list the overlay is checked against — the grouped
 set of source strings the feature uses, so a key quietly dropped from all eleven files is still
@@ -77,6 +88,13 @@ the same invariants against the packs that actually ship.
 `tool/foods_seed.tsv` is the curated list — which foods exist, and which USDA record each one's
 numbers come from. It is hand-maintained; `gen_foods.mjs` only resolves it. **The `id` column is
 permanent**: a logged meal stores it, so renumbering would repoint every meal ever logged.
+
+`tool/dishes_seed.tsv` is the same idea one level up: real meals, each a list of those food ids
+with the job each one does in the dish — the anchor, the slices of bread, the cheese, the oil.
+The day planner proposes the user's own saved recipes ahead of any of these, so the catalogue
+only has to cover the fortnight before there are any. **It is capped at 60** for that reason:
+dish sixty-one is worth almost nothing next to one recipe the user writes down, and costs eleven
+translations. `gen_dishes.mjs` refuses to write a catalogue naming a food that does not exist.
 
 Household portions come from the same USDA records, with one trap worth knowing about: the bulk
 dataset drops the `amount` field the API carries, so `{modifier: "oz", gramWeight: 113}` is
@@ -93,13 +111,15 @@ are hand-drawn in a file it does not touch.
 ```
 lib/
 ├── data/models/          AppState and everything in it — the JSON contract with openGym
-├── data/repositories/    persistence, and the auth/sync seam
+├── data/repositories/    persistence, meal photos, and the auth/sync seam
+├── data/ai/              the keychain, and one raw-HTTP adapter per provider
 ├── domain/               pure logic, ported 1:1 from openGym's lib/
 │                         history · progression · effort · onerm · muscles · format
 │                         i18n · glyphs · exercises · starter · import_csv · plan_share
 │                         ...and, with no upstream: nutrition · met · foods
 │                         coaching (what to say next) · day_plan (what a day looks like)
-├── platform/             notifications, wake lock, backup/share
+├── domain/ai/            the provider seam, the prompt, and the sanitizer that never trusts it
+├── platform/             notifications, wake lock, backup/share, the camera
 ├── state/                the two stores: persisted state, and ephemeral UI state
 └── ui/
     ├── theme/            every token from openGym's index.css
@@ -128,8 +148,10 @@ lib/
   population, a MET table inferred from a body part, and a portion size somebody eyeballed. Stats
   compares what the log *predicted* against what the scale actually did and reports the gap,
   because the only number that generalises to one person is whether these estimates run high or
-  low for them. `nutrition` and `meals` are the two keys myOpenGym adds that openGym has no
-  default for, and both stay absent from a backup until the feature is used.
+  low for them. `nutrition`, `meals` and `ai` are the three keys myOpenGym adds that openGym has
+  no default for, and all three stay absent from a backup until the feature is used. `ai` holds
+  which provider answers which feature and never a credential — keys live in the phone keychain,
+  because the state is mirrored to a plaintext file and copied into every backup.
 - **Progression is derived, never stored.** Fixing a mistyped set from three weeks ago
   immediately produces the right next target, because nothing was cached.
 
@@ -139,7 +161,7 @@ lib/
 flutter test
 ```
 
-277 tests. The valuable ones are ports of openGym's own suites — its progression, history,
+658 tests. The valuable ones are ports of openGym's own suites — its progression, history,
 effort, 1RM and import assertions, running unchanged against the Dart — plus a JSON round-trip
 that is the gate on backup compatibility, and a differential check of `weekKey` against the
 original's own output across three years of dates.

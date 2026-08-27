@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'screens/ai_settings_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
@@ -8,6 +9,7 @@ import 'screens/nutrition_screen.dart';
 import 'screens/food_library_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/plan_screen.dart';
+import 'screens/recipes_screen.dart';
 import 'screens/routine_edit_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/stats_screen.dart';
@@ -28,10 +30,12 @@ GoRouter buildRouter() => GoRouter(
         _page('/workout', (_, _) => const WorkoutScreen()),
         _page('/nutrition', (_, _) => const NutritionScreen()),
         _page('/nutrition/foods', (_, _) => const FoodLibraryScreen()),
+        _page('/nutrition/recipes', (_, _) => const RecipesScreen()),
         _page('/stats', (_, _) => const StatsScreen()),
         _page('/history', (_, _) => const HistoryScreen()),
         _page('/library', (_, _) => const LibraryScreen()),
         _page('/settings', (_, _) => const SettingsScreen()),
+        _page('/settings/ai', (_, _) => const AiSettingsScreen()),
       ],
       // Anything unrecognised goes home rather than showing an error page.
       errorBuilder: (context, state) => const HomeScreen(),

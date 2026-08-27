@@ -435,7 +435,10 @@ String signatureOf(Iterable<MealItem> items) {
 /// The evidence behind offering to save one. Nothing is saved automatically: a suggestion the
 /// user accepts is a meal they will use, and one the app invents is clutter they have to delete.
 List<({String signature, Meal example, int count})> repeatedMeals(AppState s, {int min = 3}) {
-  final saved = {for (final x in s.nutrition.templates) signatureOf(x.items)};
+  // A recipe's own items are the batch; what gets logged is one portion of it. Signing the
+  // portion is what keeps a four-serving stew from being offered back as something to save
+  // every time a bowl of it is eaten.
+  final saved = {for (final x in s.nutrition.templates) signatureOf(x.portion())};
   final counts = <String, int>{};
   final example = <String, Meal>{};
   for (final m in s.meals) {

@@ -210,6 +210,18 @@ void main() {
     }
   });
 
+  test('nothing filed as protein is a composite dish in disguise', () {
+    // Density alone is not enough to catch a bad match. "Ham" resolved to LEAN POCKETS Ham 'N
+    // Cheddar — a frozen filled pastry at 32.5 g of carbohydrate, whose density of 4.48 cleared
+    // the floor above, so it sat in the catalogue as a meat and the day planner offered it as
+    // one. Starch is what separates a prepared dish from an ingredient here: the pulses are the
+    // legitimate ceiling at 27.4 g (chickpeas), and the next food down is edamame at 8.9, so
+    // there is real room between the honest maximum and the pastry.
+    for (final f in all.where((f) => f.cat == 'protein')) {
+      expect(f.c, lessThan(30), reason: '${f.n} carries ${f.c}C per 100 g');
+    }
+  });
+
   test('protein density ranks by what a calorie budget can afford', () {
     final chicken = all.firstWhere((f) => f.n == 'Chicken breast');
     final parmesan = all.firstWhere((f) => f.n == 'Parmesan');

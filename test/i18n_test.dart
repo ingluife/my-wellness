@@ -39,7 +39,7 @@ void main() {
   test('the nutrition strings are present in every language', () {
     final groups = jsonDecode(File('tool/nutrition_keys.json').readAsStringSync()) as Map;
     final expected = [for (final g in groups.values) ...(g as List).cast<String>()];
-    expect(expected, hasLength(562));
+    expect(expected, hasLength(740));
     for (final e in packs.entries) {
       final missing = expected.where((k) => !e.value.containsKey(k)).toList();
       expect(missing, isEmpty, reason: '${e.key} is missing ${missing.length} nutrition strings');
@@ -78,6 +78,32 @@ void main() {
             reason: '${e.key}: "${kv.key}" -> "${kv.value}"');
       }
     }
+  });
+
+  test('every t() literal in the app is actually translated somewhere', () {
+    // The direction nothing checked before, and the gap is silent by construction: a `t()` whose
+    // key is in no pack falls back to English and renders perfectly, so a screen can ship
+    // English-only in all twelve languages without one test going red. That is exactly what
+    // happened when the AI screens were added — 53 strings, no failure.
+    //
+    // German stands in for "some pack has it": every pack carries identical keys, which the test
+    // above already asserts.
+    final pack = packs['de']!;
+    final literal = RegExp(r"\bt\(\s*'((?:[^'\\]|\\.)*)'");
+
+    final missing = <String, Set<String>>{};
+    for (final f in Directory('lib').listSync(recursive: true).whereType<File>()) {
+      if (!f.path.endsWith('.dart')) continue;
+      for (final m in literal.allMatches(f.readAsStringSync())) {
+        final key = m[1]!.replaceAll(r"\'", "'");
+        if (!pack.containsKey(key)) (missing[f.path] ??= {}).add(key);
+      }
+    }
+
+    expect(missing, isEmpty,
+        reason: 'these strings render English in every language — add them to '
+            'tool/nutrition_keys.json and tool/locales_nutrition/*.js, then run '
+            'tool/check_i18n_nutrition.mjs and tool/gen_i18n.mjs');
   });
 
   test('no translation is left blank', () {

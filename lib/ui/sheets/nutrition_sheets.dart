@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import '../../data/models/app_state.dart';
 import '../../domain/format.dart';
 import '../../domain/coaching.dart';
+import '../../domain/dishes.dart';
 import '../../domain/foods.dart';
 import '../../domain/i18n.dart';
 import '../../domain/nutrition.dart';
+import '../../state/ai_provider.dart';
 import '../../state/app_state_provider.dart';
 import '../../ui/app.dart';
 import '../theme/app_colors.dart';
@@ -17,12 +19,17 @@ import '../widgets/app_icon.dart';
 import '../widgets/controls/app_button.dart';
 import '../widgets/page.dart';
 import '../widgets/controls/fields.dart';
+import '../widgets/controls/pressable.dart';
 import '../widgets/controls/select_row.dart';
 import '../widgets/controls/stepper.dart';
 import '../widgets/controls/surfaces.dart';
 import '../widgets/controls/toggles.dart';
 import '../widgets/macro_bar.dart';
 import '../widgets/media.dart';
+// A cycle: the photo sheet's "Log it by hand" and "Add something it missed" reach back into this
+// file. That is what the two sheets genuinely are to each other — either can be the way out of
+// the other — and Dart resolves it without complaint.
+import 'meal_photo_sheet.dart';
 import 'sheet_service.dart';
 
 /// Age, height, sex and activity — the numbers a calorie estimate cannot be made without.
@@ -317,6 +324,29 @@ class _GoalSheetState extends ConsumerState<_GoalSheet> {
           t('Only decides how the day is split up. What you eat in total is what moves the scale.'),
           style: ts(TypeScale.foot, color: c.label3),
         ),
+        const SizedBox(height: 14),
+        Section(
+          title: t('Kitchen'),
+          footer: t('Which food the day plan suggests. Your own saved recipes always come first.'),
+          children: [
+            SelectRow<String>(
+              icon: 'meal',
+              title: t('Kitchen'),
+              value: cuisineOf(s),
+              sheetTitle: t('Which food do you cook?'),
+              options: [
+                for (final key in cuisines)
+                  SelectOption(key, t(cuisineName[key] ?? key)),
+              ],
+              // Written straight through rather than held in a draft field: this changes what
+              // the plan suggests, never what the day has to add up to, so it has no business
+              // in the target being recomputed below.
+              onChanged: (v) => ref
+                  .read(appStateProvider.notifier)
+                  .update((st) => st.nutrition.goal.cuisine = v),
+            ),
+          ],
+        ),
         const SizedBox(height: 18),
         if (target != null) ...[
           AppCard(
@@ -456,10 +486,24 @@ class _BreakdownSheet extends ConsumerWidget {
 /// attached, such as a suggested day plan's proposed portion. [onLogged] fires right after "Add
 /// to the day" actually writes the item, so a caller showing its own pending/logged state (the
 /// day plan sheet) can update without this sheet knowing anything about that state itself.
+///
+/// [onPicked] switches the sheet from logging to *choosing*: the portion is handed back and
+/// nothing is written. That is what the recipe editor needs — an ingredient list is not a day,
+/// and a food chosen for a recipe has not been eaten. Given [onPicked], [iso] is ignored.
 Future<void> foodDetailSheet(Food food,
-        {String? iso, double? slot, double? initialGrams, VoidCallback? onLogged}) =>
+        {String? iso,
+        double? slot,
+        double? initialGrams,
+        VoidCallback? onLogged,
+        void Function(MealItem)? onPicked}) =>
     showSheet<void>((context, close) => _FoodDetailSheet(
-        food: food, iso: iso, slot: slot, initialGrams: initialGrams, onLogged: onLogged, close: close));
+        food: food,
+        iso: iso,
+        slot: slot,
+        initialGrams: initialGrams,
+        onLogged: onLogged,
+        onPicked: onPicked,
+        close: close));
 
 class _FoodDetailSheet extends ConsumerStatefulWidget {
   const _FoodDetailSheet({
@@ -469,6 +513,7 @@ class _FoodDetailSheet extends ConsumerStatefulWidget {
     this.slot,
     this.initialGrams,
     this.onLogged,
+    this.onPicked,
   });
 
   final Food food;
@@ -476,6 +521,7 @@ class _FoodDetailSheet extends ConsumerStatefulWidget {
   final double? slot;
   final double? initialGrams;
   final VoidCallback? onLogged;
+  final void Function(MealItem)? onPicked;
   final void Function([void]) close;
 
   @override
@@ -588,7 +634,8 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: ListItem(
                   leading: FoodThumb(food: swap, size: 40),
-                  onTap: () => foodDetailSheet(swap, iso: widget.iso, slot: widget.slot),
+                  onTap: () => foodDetailSheet(swap,
+                      iso: widget.iso, slot: widget.slot, onPicked: widget.onPicked),
                   trailing: [
                     Tag('+${fmtNum(swap.p - f.p)}P', accent: true, capitalize: false),
                   ],
@@ -601,7 +648,19 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
               ),
             const SizedBox(height: 6),
           ],
-          if (widget.iso != null) ...[
+          if (widget.onPicked case final picked?)
+            AppButton(t('Add'), variant: BtnVariant.primary, onTap: () {
+              if (_grams <= 0) {
+                ref.read(uiProvider).toast(t('Enter a portion first'));
+                return;
+              }
+              // Closed before the callback runs, not after: the picker underneath closes itself
+              // from inside [picked], and popping these two in any order but last-in-first-out
+              // takes the wrong route off the stack.
+              widget.close();
+              picked(item);
+            })
+          else if (widget.iso != null) ...[
             AppButton(t('Add to the day'), variant: BtnVariant.primary, onTap: () {
               if (_grams <= 0) {
                 ref.read(uiProvider).toast(t('Enter a portion first'));
@@ -641,14 +700,17 @@ void addMealItem(WidgetRef ref, {required String iso, double? slot, required Mea
   });
 }
 
-/// Logs a whole saved meal into a slot in one tap.
+/// Logs one portion of a saved recipe into a slot in one tap.
 ///
 /// Goes through [addMealItem] rather than appending a Meal directly, so slot-merging behaves
 /// exactly as it does for a food added by hand — a template dropped into a slot that already
 /// has something in it joins that meal instead of creating a second one.
+///
+/// One *portion*, not the whole ingredient list: a recipe written down as the pot it was cooked
+/// in is eaten a bowl at a time, and `MealTemplate.portion` is where that division lives.
 void logTemplate(WidgetRef ref, MealTemplate template,
     {required String iso, double? slot}) {
-  for (final item in template.items) {
+  for (final item in template.portion()) {
     addMealItem(ref, iso: iso, slot: slot, item: item);
   }
   ref.read(appStateProvider.notifier).update((st) {
@@ -659,25 +721,77 @@ void logTemplate(WidgetRef ref, MealTemplate template,
   });
 }
 
-/// Name a meal and keep it.
-Future<void> saveMealSheet(WidgetRef ref, List<MealItem> items, {String? suggestedName}) =>
-    showSheet<void>((context, close) =>
-        _SaveMealSheet(items: items, suggestedName: suggestedName, close: close));
+/// The meal slots a recipe can be filed under, as English source strings.
+///
+/// Taken from the meal splits rather than invented, so a recipe's slot and the slot the planner
+/// is filling are the same word. Deliberately the four names every split is built out of and not
+/// whatever `mealSplit` returns for the current setting: a recipe outlives a change to how many
+/// meals a day is divided into, and re-filing every breakfast because the user moved from four
+/// meals to five would be absurd.
+const recipeSlots = <String>['Breakfast', 'Lunch', 'Snack', 'Dinner'];
 
-class _SaveMealSheet extends ConsumerStatefulWidget {
-  const _SaveMealSheet({required this.items, required this.close, this.suggestedName});
+/// Write down a recipe, or change one already written down.
+///
+/// [existing] edits in place; without it this is a new recipe, optionally seeded with [items]
+/// from a meal already on the day — which is how the "logged this three times, save it?" offer
+/// arrives here with the work already done.
+/// [slot] pre-files a new recipe under a meal — an English name from [recipeSlots], never a
+/// translated one, since that is what gets stored and what the planner matches on.
+Future<void> recipeSheet(
+  WidgetRef ref, {
+  MealTemplate? existing,
+  List<MealItem>? items,
+  String? suggestedName,
+  String? slot,
+}) =>
+    showSheet<void>((context, close) => _RecipeSheet(
+          existing: existing,
+          items: items,
+          suggestedName: suggestedName,
+          slot: slot,
+          close: close,
+        ));
 
-  final List<MealItem> items;
+/// Name a meal and keep it — the shape the day screen's "save it?" offer still calls.
+Future<void> saveMealSheet(WidgetRef ref, List<MealItem> items,
+        {String? suggestedName, String? slot}) =>
+    recipeSheet(ref, items: items, suggestedName: suggestedName, slot: slot);
+
+class _RecipeSheet extends ConsumerStatefulWidget {
+  const _RecipeSheet({
+    required this.close,
+    this.existing,
+    this.items,
+    this.suggestedName,
+    this.slot,
+  });
+
+  final MealTemplate? existing;
+  final List<MealItem>? items;
   final String? suggestedName;
+  final String? slot;
   final void Function([void]) close;
 
   @override
-  ConsumerState<_SaveMealSheet> createState() => _SaveMealSheetState();
+  ConsumerState<_RecipeSheet> createState() => _RecipeSheetState();
 }
 
-class _SaveMealSheetState extends ConsumerState<_SaveMealSheet> {
-  late final TextEditingController _name =
-      TextEditingController(text: widget.suggestedName ?? '');
+class _RecipeSheetState extends ConsumerState<_RecipeSheet> {
+  late final TextEditingController _name = TextEditingController(
+      text: widget.existing?.n ?? widget.suggestedName ?? '');
+
+  /// The draft ingredient list. Copied out of whatever seeded it, because a sheet the user can
+  /// close without saving must not have edited the stored recipe on the way.
+  late final List<MealItem> _items = [
+    for (final i in widget.existing?.items ?? widget.items ?? const <MealItem>[]) i.copy()
+  ];
+
+  late String? _slot =
+      widget.existing?.slot ?? (recipeSlots.contains(widget.slot) ? widget.slot : null);
+
+  late double _servings = widget.existing?.perServing ?? 1;
+
+  bool get _isNew => widget.existing == null;
 
   @override
   void dispose() {
@@ -685,64 +799,187 @@ class _SaveMealSheetState extends ConsumerState<_SaveMealSheet> {
     super.dispose();
   }
 
+  double get _batchKcal => _items.fold(0.0, (a, i) => a + i.kcal);
+
+  ({double kcal, double p, double c, double f}) get _perServing => (
+        kcal: _batchKcal / _servings,
+        p: _items.fold<double>(0, (a, i) => a + i.p) / _servings,
+        c: _items.fold<double>(0, (a, i) => a + i.c) / _servings,
+        f: _items.fold<double>(0, (a, i) => a + i.f) / _servings,
+      );
+
+  void _save() {
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      ref.read(uiProvider).toast(t('Give it a name'));
+      return;
+    }
+    if (_items.isEmpty) {
+      ref.read(uiProvider).toast(t('Add at least one ingredient'));
+      return;
+    }
+
+    ref.read(appStateProvider.notifier).update((st) {
+      final saved = st.nutrition.templates.where((x) => x.id == widget.existing?.id).firstOrNull;
+      final target = saved ??
+          () {
+            final made = MealTemplate(id: 'mt${uid()}', n: name, used: 0);
+            st.nutrition.templates.add(made);
+            return made;
+          }();
+      target
+        ..n = name
+        ..items = [for (final i in _items) i.copy()]
+        ..slot = _slot
+        // Absent rather than 1, so a recipe nobody batch-cooks stays out of the export the way
+        // every other never-chosen field does.
+        ..servings = _servings == 1 ? null : _servings
+        ..last = DateTime.now().millisecondsSinceEpoch;
+    });
+    widget.close();
+    ref.read(uiProvider).toast(t('Saved {0}', name));
+  }
+
+  void _delete() {
+    final id = widget.existing?.id;
+    if (id == null) return;
+    ref
+        .read(appStateProvider.notifier)
+        .update((st) => st.nutrition.templates.removeWhere((x) => x.id == id));
+    widget.close();
+    ref.read(uiProvider).toast(t('Deleted {0}', widget.existing!.n));
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final kcal = widget.items.fold(0.0, (a, i) => a + i.kcal);
+    final per = _perServing;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SheetTitle(t('Save this meal')),
-        Text(t('Give it a name and it is one tap next time.'),
-            style: ts(TypeScale.foot, color: c.label2)),
-        const SizedBox(height: 12),
-        AppTextField(controller: _name, placeholder: t('Name')),
-        const SizedBox(height: 12),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final i in widget.items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Row(children: [
-                    Expanded(
-                      child: Text(mealItemName(i),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: ts(TypeScale.cap, color: c.label2)),
-                    ),
-                    Text('${i.kcal.round()}', style: ts(TypeScale.cap, color: c.label3)),
-                  ]),
-                ),
-              const SizedBox(height: 6),
-              Text('${kcal.round()} ${t('kcal')}',
-                  style: ts(TypeScale.foot, color: c.label, weight: FontWeight.w600)),
-            ],
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SheetTitle(_isNew ? t('New recipe') : t('Edit recipe')),
+          Text(
+            t('Write down what you actually cook. Saved recipes log in one tap, and the day plan builds itself out of them.'),
+            style: ts(TypeScale.foot, color: c.label2),
           ),
-        ),
-        AppButton(t('Save'), variant: BtnVariant.primary, onTap: () {
-          final name = _name.text.trim();
-          if (name.isEmpty) {
-            ref.read(uiProvider).toast(t('Give it a name'));
-            return;
-          }
-          ref.read(appStateProvider.notifier).update((st) {
-            st.nutrition.templates.add(MealTemplate(
-              id: 'mt${uid()}',
-              n: name,
-              items: [for (final i in widget.items) i.copy()],
-              used: 0,
-              last: DateTime.now().millisecondsSinceEpoch,
-            ));
-          });
-          widget.close();
-          ref.read(uiProvider).toast(t('Saved {0}', name));
-        }),
-        const SizedBox(height: 8),
-      ],
+          const SizedBox(height: 12),
+          AppTextField(controller: _name, placeholder: t('Name')),
+          const SizedBox(height: 10),
+          Section(children: [
+            SelectRow<String?>(
+              icon: 'meal',
+              title: t('Meal'),
+              value: _slot,
+              sheetTitle: t('When do you eat this?'),
+              options: [
+                SelectOption<String?>(null, t('Any meal')),
+                for (final slot in recipeSlots) SelectOption<String?>(slot, t(slot)),
+              ],
+              onChanged: (v) => setState(() => _slot = v),
+            ),
+            AppRow(
+              icon: 'copy',
+              title: t('Makes'),
+              subtitle: t('Portions this recipe serves'),
+              trailing: SizedBox(
+                width: 128,
+                child: AppStepper(
+                  value: _servings,
+                  decimal: false,
+                  onChanged: (v) => setState(() => _servings = (v ?? 1).clamp(1, 20)),
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          SecHeading(t('Ingredients')),
+          if (_items.isEmpty)
+            EmptyState(
+              icon: 'meal',
+              message: t('Nothing in it yet'),
+              detail: t('Add the foods it is made of.'),
+            )
+          else
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < _items.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(children: [
+                        FoodThumb(food: foods.or(_items[i].fid ?? ''), size: 28),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(mealItemLabel(_items[i]),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ts(TypeScale.cap, color: c.label2)),
+                        ),
+                        Text('${_items[i].kcal.round()}',
+                            style: ts(TypeScale.cap, color: c.label3)),
+                        const SizedBox(width: 8),
+                        Pressable(
+                          scale: .9,
+                          onTap: () => setState(() => _items.removeAt(i)),
+                          child: AppIcon('xmark', size: 12, color: c.label4),
+                        ),
+                      ]),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+          AppButton(t('Add ingredient'), icon: 'plus', onTap: () {
+            logMealSheet(
+              ref,
+              title: t('Add ingredient'),
+              onPicked: (item) => setState(() => _items.add(item)),
+            );
+          }),
+          if (_items.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(children: [
+                    Expanded(
+                      child: Text(
+                        _servings > 1 ? t('One portion') : t('This recipe'),
+                        style: ts(TypeScale.foot, color: c.label2),
+                      ),
+                    ),
+                    Text('${per.kcal.round()} ${t('kcal')}',
+                        style: ts(TypeScale.head, color: c.label, weight: FontWeight.w600)),
+                  ]),
+                  const SizedBox(height: 10),
+                  MacroSplit(macros: per),
+                  const SizedBox(height: 8),
+                  MacroLegend(macros: per),
+                  if (_servings > 1) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      t('{0} portions, {1} kcal in all', _servings.round(), _batchKcal.round()),
+                      style: ts(TypeScale.cap, color: c.label3),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          AppButton(t('Save'), variant: BtnVariant.primary, onTap: _save),
+          if (!_isNew) ...[
+            const SizedBox(height: 8),
+            AppButton(t('Delete'), variant: BtnVariant.danger, onTap: _delete),
+          ],
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 }
@@ -831,16 +1068,26 @@ String mealItemLabel(MealItem item) {
 }
 
 /// Search the catalogue and add something to a meal.
-Future<void> logMealSheet(WidgetRef ref, {required String iso, double? slot, String? title}) =>
-    showSheet<void>((context, close) =>
-        _LogMealSheet(iso: iso, slot: slot, title: title, close: close));
+/// [onPicked] makes this a chooser rather than a logger — see [foodDetailSheet]. With it set,
+/// [iso] is not needed: the recipe editor is picking an ingredient, not filling in a day.
+Future<void> logMealSheet(WidgetRef ref,
+        {String? iso, double? slot, String? title, void Function(MealItem)? onPicked}) =>
+    showSheet<void>((context, close) => _LogMealSheet(
+        iso: iso, slot: slot, title: title, onPicked: onPicked, close: close));
 
 class _LogMealSheet extends ConsumerStatefulWidget {
-  const _LogMealSheet({required this.iso, required this.close, this.slot, this.title});
+  const _LogMealSheet({
+    required this.close,
+    this.iso,
+    this.slot,
+    this.title,
+    this.onPicked,
+  });
 
-  final String iso;
+  final String? iso;
   final double? slot;
   final String? title;
+  final void Function(MealItem)? onPicked;
   final void Function([void]) close;
 
   @override
@@ -850,6 +1097,20 @@ class _LogMealSheet extends ConsumerStatefulWidget {
 class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   String _query = '';
   String? _cat;
+
+  /// Picking an ingredient finishes with this sheet too, not just the one on top of it.
+  ///
+  /// Choosing a food to log leaves the picker up, because the next thing you do is usually log
+  /// another one. Choosing an ingredient for a recipe is the opposite: the recipe is what you
+  /// came here from and what you need to see the result on.
+  void Function(MealItem)? get _picked {
+    final onPicked = widget.onPicked;
+    if (onPicked == null) return null;
+    return (item) {
+      widget.close();
+      onPicked(item);
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -886,7 +1147,12 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
             children: [
               if (recent.isNotEmpty) ...[
                 SecHeading(t('Recent')),
-                for (final f in recent) _FoodRow(food: f, iso: widget.iso, slot: widget.slot),
+                for (final f in recent)
+                  _FoodRow(
+                      food: f,
+                      iso: widget.iso,
+                      slot: widget.slot,
+                      onPicked: _picked),
                 const SizedBox(height: 10),
                 SecHeading(t('All foods')),
               ],
@@ -897,19 +1163,45 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                   detail: t('Add one of your own instead.'),
                 )
               else
-                for (final f in list) _FoodRow(food: f, iso: widget.iso, slot: widget.slot),
+                for (final f in list)
+                  _FoodRow(
+                      food: f,
+                      iso: widget.iso,
+                      slot: widget.slot,
+                      onPicked: _picked),
             ],
           ),
         ),
         const SizedBox(height: 10),
+        // The plate is usually still in front of the user when they open this sheet, and it fills
+        // it in one action rather than one food at a time — so it goes above the two that add a
+        // single item, at full width, rather than becoming a third narrow button beside them.
+        //
+        // It was reachable before only from a 15px glyph on the card behind this sheet, which is
+        // not an entry point anybody finds. Absent rather than disabled when the feature is off,
+        // like every other affordance this feature owns.
+        if (widget.iso case final iso?
+            when widget.onPicked == null && ref.watch(aiMealPhotoProvider).isAvailable) ...[
+          AppButton(t('Log from a photo'), icon: 'sparkles', onTap: () {
+            // Closed first: this sheet has served its purpose, and leaving it under the review
+            // sheet would put the user back in a food search after they confirmed a meal.
+            widget.close();
+            mealPhotoSheet(ref, iso: iso, slot: widget.slot);
+          }),
+          const SizedBox(height: 8),
+        ],
         Row(children: [
-          Expanded(
-            child: AppButton(t('Quick add'), icon: 'bolt', onTap: () {
-              widget.close();
-              quickAddSheet(ref, iso: widget.iso, slot: widget.slot);
-            }),
-          ),
-          const SizedBox(width: 8),
+          // Calories with no food behind them belong to a day, not to a recipe: an ingredient
+          // list whose entries cannot be re-costed is not one the planner can scale.
+          if (widget.iso case final iso? when widget.onPicked == null) ...[
+            Expanded(
+              child: AppButton(t('Quick add'), icon: 'bolt', onTap: () {
+                widget.close();
+                quickAddSheet(ref, iso: iso, slot: widget.slot);
+              }),
+            ),
+            const SizedBox(width: 8),
+          ],
           Expanded(
             child: AppButton(t('Your own food'), icon: 'plus', onTap: () {
               widget.close();
@@ -924,11 +1216,12 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
 }
 
 class _FoodRow extends StatelessWidget {
-  const _FoodRow({required this.food, required this.iso, required this.slot});
+  const _FoodRow({required this.food, this.iso, this.slot, this.onPicked});
 
   final Food food;
-  final String iso;
+  final String? iso;
   final double? slot;
+  final void Function(MealItem)? onPicked;
 
   @override
   Widget build(BuildContext context) {
@@ -936,7 +1229,7 @@ class _FoodRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: ListItem(
         leading: FoodThumb(food: food, size: 44),
-        onTap: () => foodDetailSheet(food, iso: iso, slot: slot),
+        onTap: () => foodDetailSheet(food, iso: iso, slot: slot, onPicked: onPicked),
         child: ItemText(
           t(food.n),
           subtitle: '${food.kcal.round()} ${t('kcal')} · '

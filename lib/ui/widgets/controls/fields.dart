@@ -308,6 +308,7 @@ class AppTextField extends StatefulWidget {
     this.textAlign = TextAlign.start,
     this.style,
     this.textCapitalization = TextCapitalization.sentences,
+    this.obscureText = false,
   });
 
   final TextEditingController? controller;
@@ -319,6 +320,14 @@ class AppTextField extends StatefulWidget {
   final TextAlign textAlign;
   final TextStyle? style;
   final TextCapitalization textCapitalization;
+
+  /// Masks the text, and turns off autocorrect and suggestions with it.
+  ///
+  /// Only the AI settings screen sets this — an API key is the first and only secret the app
+  /// accepts. The suggestion strip matters as much as the masking here: a keyboard that learns
+  /// a 100-character key and later offers it as an autocomplete in another app has leaked it
+  /// just as surely as showing it on screen would.
+  final bool obscureText;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -354,7 +363,11 @@ class _AppTextFieldState extends State<AppTextField> {
         maxLines: widget.maxLines,
         autofocus: widget.autofocus,
         textAlign: widget.textAlign,
-        textCapitalization: widget.textCapitalization,
+        textCapitalization:
+            widget.obscureText ? TextCapitalization.none : widget.textCapitalization,
+        obscureText: widget.obscureText,
+        autocorrect: !widget.obscureText,
+        enableSuggestions: !widget.obscureText,
         textAlignVertical: area ? TextAlignVertical.top : null,
         style: widget.style ?? ts(TypeScale.body, color: c.label),
         cursorColor: c.acc,

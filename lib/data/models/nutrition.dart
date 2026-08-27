@@ -83,13 +83,21 @@ class NutritionGoal {
   /// Meals per day. null = never chosen, read as 4.
   double? meals;
 
+  /// Which kitchen the day plan cooks from. null = never chosen, read from the UI language.
+  ///
+  /// Here rather than on [BodyProfile] because [meals] is the precedent: a field that shapes how
+  /// the day is presented and never touches what the day has to add up to. Nothing downstream of
+  /// this may reach the calorie target, or a preference about food becomes a change to the plan.
+  String? cuisine;
+
   bool get isDefault =>
       mode == null &&
       rate == null &&
       kcal == null &&
       protein == null &&
       fatPct == null &&
-      meals == null;
+      meals == null &&
+      cuisine == null;
 
   factory NutritionGoal.fromJson(Map<String, dynamic> j) => NutritionGoal(
         mode: asStr(j['mode']),
@@ -98,7 +106,7 @@ class NutritionGoal {
         protein: asNum(j['protein']),
         fatPct: asNum(j['fatPct']),
         meals: asNum(j['meals']),
-      );
+      )..cuisine = asStr(j['cuisine']);
 
   Map<String, dynamic> toJson() {
     final m = <String, dynamic>{};
@@ -108,6 +116,7 @@ class NutritionGoal {
     putNum(m, 'protein', protein);
     putNum(m, 'fatPct', fatPct);
     putNum(m, 'meals', meals);
+    put(m, 'cuisine', cuisine);
     return m;
   }
 
@@ -286,16 +295,23 @@ class MealItem {
   MealItem copy() => MealItem.fromJson(toJson());
 }
 
-/// A meal worth logging again.
+/// A meal worth logging again — the user's own recipes.
 ///
 /// Most people rotate ten to fifteen meals. Without this the app makes them rebuild each one
 /// food by food every time, which is the single biggest reason a food log gets abandoned in
 /// week one.
+///
+/// These are also the best thing the day planner has to offer. A bundled catalogue of dishes
+/// can only ever guess at what somebody eats; this is the answer, written down by the person
+/// who eats it, in their own words and their own language. [slot] and [servings] exist so the
+/// planner can use one — it has to know when a recipe is eaten and what one portion of it is.
 class MealTemplate {
   MealTemplate({
     required this.id,
     required this.n,
     List<MealItem>? items,
+    this.slot,
+    this.servings,
     this.used,
     this.last,
   }) : items = items ?? [];
@@ -304,20 +320,65 @@ class MealTemplate {
   String n;
   List<MealItem> items;
 
+  /// Which meal of the day this is, as an English slot name from `mealSplit` — 'Breakfast',
+  /// 'Lunch', 'Snack', 'Dinner'. null = never chosen, and the planner reads it as "any".
+  ///
+  /// A name rather than the numeric index [Meal.slot] carries, and deliberately so: that index
+  /// is a position in whatever meal split was current when it was written, and index 2 is a
+  /// snack under a four-meal day and lunch under a six-meal one. A recipe outlives that setting.
+  String? slot;
+
+  /// How many portions [items] makes. null = never chosen, read as 1.
+  ///
+  /// The difference between a saved meal and a recipe. A stew is entered once, as the pot, and
+  /// eaten a bowl at a time; without this the ingredient list has to be pre-divided by hand and
+  /// re-entered whenever the batch size changes.
+  double? servings;
+
   /// Times logged, and when it was last logged. Together they order the list by what the user
   /// actually eats, the way recent foods are already ordered.
   double? used;
   int? last;
 
-  double get kcal => items.fold(0, (a, i) => a + i.kcal);
-  double get p => items.fold(0, (a, i) => a + i.p);
-  double get c => items.fold(0, (a, i) => a + i.c);
-  double get f => items.fold(0, (a, i) => a + i.f);
+  /// What the whole ingredient list comes to.
+  double get batchKcal => items.fold(0, (a, i) => a + i.kcal);
+
+  /// What one portion comes to — what the list, the log and the planner all read.
+  double get kcal => batchKcal / perServing;
+  double get p => items.fold<double>(0, (a, i) => a + i.p) / perServing;
+  double get c => items.fold<double>(0, (a, i) => a + i.c) / perServing;
+  double get f => items.fold<double>(0, (a, i) => a + i.f) / perServing;
+
+  /// [servings], read. Guarded because a zero here would divide every macro into infinity, and
+  /// the field is reachable from an imported or hand-edited state.
+  double get perServing {
+    final n = servings ?? 1;
+    return n < 1 ? 1 : n;
+  }
+
+  /// One portion of this recipe, ready to log.
+  List<MealItem> portion() {
+    final n = perServing;
+    return [
+      for (final i in items)
+        MealItem(
+          fid: i.fid,
+          n: i.n,
+          g: i.g / n,
+          kcal: i.kcal / n,
+          p: i.p / n,
+          c: i.c / n,
+          f: i.f / n,
+        )
+    ];
+  }
 
   factory MealTemplate.fromJson(Map<String, dynamic> j) => MealTemplate(
         id: asStr(j['id']) ?? '',
         n: asStr(j['n']) ?? '',
         items: asList(j['items'], MealItem.fromJson),
+        slot: asStr(j['slot']),
+        servings: asNum(j['servings']),
         used: asNum(j['used']),
         last: asNum(j['last'])?.toInt(),
       );
@@ -325,6 +386,8 @@ class MealTemplate {
   Map<String, dynamic> toJson() {
     final m = <String, dynamic>{'id': id, 'n': n};
     m['items'] = [for (final i in items) i.toJson()];
+    put(m, 'slot', slot);
+    putNum(m, 'servings', servings);
     putNum(m, 'used', used);
     put(m, 'last', last);
     return m;
@@ -337,7 +400,13 @@ class MealTemplate {
 /// at — the same split BodyWeightEntry uses, and for the same reason: a late dinner still
 /// belongs to the day it was eaten on.
 class Meal {
-  Meal({required this.id, required this.d, this.t, this.slot, List<MealItem>? items})
+  Meal(
+      {required this.id,
+      required this.d,
+      this.t,
+      this.slot,
+      this.photo,
+      List<MealItem>? items})
       : items = items ?? [];
 
   final String id;
@@ -347,6 +416,18 @@ class Meal {
   /// Which slot of the day, as an index into the plan's meal split. Absent means unassigned,
   /// which still counts towards the day's totals.
   double? slot;
+
+  /// The photograph this meal was drafted from, as a **file name** — never a path.
+  ///
+  /// A path would be wrong within a week: the app's documents directory is re-created with a new
+  /// container id on every iOS reinstall and restore, so an absolute path written today points at
+  /// nothing tomorrow while looking perfectly valid. The name is resolved against whatever the
+  /// directory happens to be now, by `MealPhotoStore`.
+  ///
+  /// Nothing depends on it. The file is decoration on a record that is complete without it: it is
+  /// not in a backup, it is deleted after 90 days, and it is dropped the moment the file behind it
+  /// is gone. Every reader has to treat a missing photo as ordinary, because it is.
+  String? photo;
 
   List<MealItem> items;
 
@@ -360,6 +441,7 @@ class Meal {
         d: asStr(j['d']) ?? '',
         t: asNum(j['t'])?.toInt(),
         slot: asNum(j['slot']),
+        photo: asStr(j['photo']),
         items: asList(j['items'], MealItem.fromJson),
       );
 
@@ -367,6 +449,9 @@ class Meal {
     final m = <String, dynamic>{'id': id, 'd': d};
     put(m, 't', t);
     putNum(m, 'slot', slot);
+    // Absent until there is one, the same contract `nutrition`, `meals` and `ai` follow at the top
+    // level — a meal logged by hand serialises exactly as it did before this key existed.
+    put(m, 'photo', photo);
     m['items'] = [for (final i in items) i.toJson()];
     return m;
   }

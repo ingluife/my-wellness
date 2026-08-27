@@ -37,6 +37,17 @@ dependencies:
 
   intl: ^0.20.2
 
+  # Meal photos — the only feature that touches the network, and only with the user's own API key.
+  # http rather than dart:io's HttpClient because its Client is injectable, which is what lets the
+  # provider adapters be tested without a socket and without a mocking library.
+  http: ^1.6.0
+  # The API keys, in the platform keychain. Never in AppState — see lib/data/ai/ai_key_store.dart.
+  # Held at 10.x deliberately: 11.x pulls win32 ^6 through its Windows implementation and
+  # share_plus 12 pins win32 ^5, so the two cannot co-exist. Neither package's Windows half is
+  # reachable from an Android/iOS build, but pub still has to solve for it.
+  flutter_secure_storage: ^10.3.1
+  image_picker: ^1.2.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

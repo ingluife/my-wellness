@@ -149,6 +149,16 @@ class _DayPlanSheetState extends ConsumerState<_DayPlanSheet> {
             Text('${meal.macros.kcal.round()} ${t('kcal')}',
                 style: ts(TypeScale.foot, color: c.label2)),
           ]),
+          // What the meal is called, when it came from somewhere that had a name for it. Not
+          // translated: a recipe's name is the user's own words, and the only names the app
+          // supplies for itself are already through `t()` by the time they arrive here.
+          if (meal.dish case final dish?) ...[
+            const SizedBox(height: 2),
+            Text(dish,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: ts(TypeScale.foot, color: c.label2)),
+          ],
           const SizedBox(height: 10),
           for (var i = 0; i < meal.items.length; i++)
             _item(context, meal, i),

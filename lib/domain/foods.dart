@@ -154,8 +154,13 @@ class Food {
 
 /// The catalogue order the library browses in, and the order category chips appear in:
 /// what a lifter is looking for first.
+///
+/// 'other' comes last and is genuinely other — the condiments a dish is seasoned with, and the
+/// default every food the user defines themselves lands in. It was missing from this list for
+/// as long as the list existed, which meant a profile full of its own foods had no way to
+/// filter down to them.
 const foodCategories = <String>[
-  'protein', 'dairy', 'carb', 'veg', 'fruit', 'fat', 'drink',
+  'protein', 'dairy', 'carb', 'veg', 'fruit', 'fat', 'drink', 'other',
 ];
 
 /// English display names; these strings are the i18n keys.

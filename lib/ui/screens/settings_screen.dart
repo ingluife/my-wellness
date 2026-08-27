@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/app_state.dart';
+import '../../domain/ai/ai_provider.dart';
 import '../../domain/format.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
 import '../../domain/nutrition.dart';
+import '../../state/ai_provider.dart';
 import '../../state/app_state_provider.dart';
 import '../app.dart';
 import '../sheets/effort_help_sheet.dart';
@@ -44,13 +46,27 @@ class SettingsScreen extends ConsumerWidget {
         ),
 
         // ---------- your data ----------
+        //
+        // Conditional, and it has to be. This row made an unconditional promise for as long as it
+        // existed, and it was true: there was no code in the app that could send anything
+        // anywhere. Meal photos changed that for the profiles that turn them on, and a claim the
+        // app no longer keeps is worse than no claim at all — so the row states which of the two
+        // situations the user is actually in.
         Section(title: t('Your data'), children: [
-          AppRow(
-            icon: 'lock',
-            iconTint: c.acc,
-            title: t('All data stays on this phone'),
-            subtitle: t('No account, no cloud — back it up anytime with Export below.'),
-          ),
+          if (_anyAiOn(s))
+            AppRow(
+              icon: 'lock',
+              iconTint: c.acc,
+              title: t('Your training log stays on this phone'),
+              subtitle: t('The only exception is a meal photo, which goes to the AI provider you set up.'),
+            )
+          else
+            AppRow(
+              icon: 'lock',
+              iconTint: c.acc,
+              title: t('All data stays on this phone'),
+              subtitle: t('No account, no cloud — back it up anytime with Export below.'),
+            ),
         ]),
 
         // ---------- general ----------
@@ -199,6 +215,22 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
 
+        // ---------- ai ----------
+        Section(
+          title: t('AI features'),
+          footer: t('Off unless you set it up, and it runs on your own provider account.'),
+          children: [
+            AppRow(
+              icon: 'sparkles',
+              iconTint: c.sys.purple,
+              title: t('AI providers'),
+              subtitle: _aiLine(s),
+              accessory: RowAccessory.chevron,
+              onTap: () => context.go('/settings/ai'),
+            ),
+          ],
+        ),
+
         ReminderSection(state: s),
 
         // ---------- appearance ----------
@@ -287,6 +319,14 @@ class SettingsScreen extends ConsumerWidget {
               danger: true,
               onConfirm: () async {
                 await ref.read(stateRepositoryProvider).clear();
+                // The keys live outside the state, so clearing the state does not reach them.
+                // Without this line a reset leaves the user's API key on the device — the one
+                // piece of data here that is genuinely a credential.
+                await ref.read(aiKeyStoreProvider).clear();
+                // Same reasoning, second store: meal photographs are files beside the state, not
+                // in it, so wiping the state leaves every one of them on the disk.
+                await ref.read(mealPhotoStoreProvider).clear();
+                ref.invalidate(aiConfiguredProvider);
                 notifier.replaceState(AppState.defaults());
                 if (context.mounted) context.go('/home');
                 ref.read(uiProvider).toast(t('All data reset'));
@@ -361,6 +401,18 @@ class _AccentRow extends StatelessWidget {
 /// The schedule itself is resynced by the app whenever the plan or the time changes; this
 /// section only owns the OS permission prompt, which belongs to the moment the switch is
 /// turned on and nowhere else.
+/// Whether any AI feature is switched on — what makes the "stays on this phone" row conditional.
+bool _anyAiOn(AppState s) => s.ai.features.values.any((f) => f.isOn);
+
+/// 'Anthropic · Claude Opus 5', or 'Off'.
+String _aiLine(AppState s) {
+  final cfg = s.ai.features[aiMealPhoto];
+  if (cfg == null || !cfg.isOn || cfg.provider == null) return t('Off');
+  final name = aiProviderName[cfg.provider] ?? cfg.provider!;
+  final model = modelFor(cfg.provider!, cfg.model);
+  return model == null ? name : '$name · ${model.label}';
+}
+
 /// "Lose 0.5 kg a week", or the mode alone when it has no rate.
 String _goalLine(AppState s) {
   final g = s.nutrition.goal;

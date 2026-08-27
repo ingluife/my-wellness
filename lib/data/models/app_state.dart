@@ -1,9 +1,11 @@
+import 'ai_settings.dart';
 import 'entries.dart';
 import 'json.dart';
 import 'nutrition.dart';
 import 'routine.dart';
 import 'workout.dart';
 
+export 'ai_settings.dart';
 export 'entries.dart';
 export 'exercise_config.dart';
 export 'json.dart';
@@ -44,6 +46,7 @@ class AppState {
     List<CustomExercise>? customEx,
     Nutrition? nutrition,
     List<Meal>? meals,
+    AiSettings? ai,
     this.ts,
     Map<String, dynamic>? extra,
   })  : reminder = reminder ?? Reminder(),
@@ -56,6 +59,7 @@ class AppState {
         customEx = customEx ?? [],
         nutrition = nutrition ?? Nutrition(),
         meals = meals ?? [],
+        ai = ai ?? AiSettings(),
         extra = extra ?? {};
 
   /// 'kg' | 'lb'. A label only — switching it never converts logged numbers.
@@ -111,6 +115,9 @@ class AppState {
   /// The food log, one entry per meal, in the order they were logged.
   List<Meal> meals;
 
+  /// Which AI provider answers which feature. Never the API keys — see [AiSettings].
+  AiSettings ai;
+
   /// `_ts` — last write, and the tiebreaker when a synced copy and a local one disagree.
   int? ts;
 
@@ -124,7 +131,7 @@ class AppState {
   static const _known = {
     'unit', 'restSec', 'sound', 'keepAwake', 'lang', 'theme', 'accent', 'body', 'targetW',
     'gifSize', 'effort', 'showRir', 'reminder', 'bodyweight', 'routines', 'week', 'dayPlan',
-    'exWeights', 'workouts', 'active', 'customEx', 'nutrition', 'meals', '_ts',
+    'exWeights', 'workouts', 'active', 'customEx', 'nutrition', 'meals', 'ai', '_ts',
   };
 
   /// `DEF` from useStore.js.
@@ -164,6 +171,7 @@ class AppState {
       customEx: asList(j['customEx'], CustomExercise.fromJson),
       nutrition: j['nutrition'] is Map ? Nutrition.fromJson(asMap(j['nutrition'])) : null,
       meals: asList(j['meals'], Meal.fromJson),
+      ai: j['ai'] is Map ? AiSettings.fromJson(asMap(j['ai'])) : null,
       ts: asNum(j['_ts'])?.toInt(),
     );
     for (final e in j.entries) {
@@ -202,6 +210,10 @@ class AppState {
     // has no default for into every backup and break the round-trip the whole model is built on.
     put(m, 'nutrition', nutrition.isDefault ? null : nutrition.toJson());
     if (meals.isNotEmpty) m['meals'] = [for (final x in meals) x.toJson()];
+    // The third key openGym has no default for, under the same absent-until-used contract. Note
+    // what is *not* written here: [AiSettings] carries no API key, deliberately, because this map
+    // ends up in a plaintext file and in every exported backup.
+    put(m, 'ai', ai.isDefault ? null : ai.toJson());
     put(m, '_ts', ts);
     m.addAll(extra);
     return m;

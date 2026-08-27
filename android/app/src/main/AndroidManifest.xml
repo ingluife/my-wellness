@@ -67,4 +67,14 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Keeps the screen on while a workout is running. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Meal photos, and nothing else. This is the only network the app makes: a request goes out
+         only when the user has set up their own API key and taken a photo for it, straight to the
+         provider they chose. No http client is even constructed unless the feature is available.
+
+         Deliberately NOT android.permission.CAMERA. image_picker fires ACTION_IMAGE_CAPTURE at
+         whatever camera app is installed and does not need it — but once CAMERA is *declared* in
+         the merged manifest, Android starts requiring it to be granted before that intent will
+         start, and the capture throws for a permission the app never asked the user for. Adding
+         it looks obviously correct and breaks the feature. See test/android_config_test.dart. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 </manifest>

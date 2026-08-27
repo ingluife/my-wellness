@@ -229,6 +229,52 @@ void main() {
       container.dispose();
     });
 
+    testWidgets('recipes can be written down, edited and thrown away', (tester) async {
+      // The storage for saved meals existed from the start, but nothing could reach it: a
+      // recipe could only come into being by logging the identical meal three times, and once
+      // saved it could never be renamed, corrected or deleted. This is the whole round trip.
+      final container = await pump(tester, profiled(), '/nutrition/recipes');
+      expect(find.text('No recipes yet'), findsOneWidget);
+
+      await press(tester, find.text('New recipe'));
+      await tester.enterText(find.byType(AppTextField).first, 'Sandwich and coffee');
+      await tester.pumpAndSettle();
+
+      // One ingredient, chosen through the same picker the food log uses.
+      await press(tester, find.text('Add ingredient').last);
+      await tester.enterText(find.byType(SearchField).first, 'White bread');
+      await tester.pumpAndSettle();
+      await press(tester, find.text('White bread').last);
+      await press(tester, find.text('Add').last);
+
+      await press(tester, find.text('Save'));
+      expect(container.read(appStateProvider).nutrition.templates, hasLength(1));
+      expect(container.read(appStateProvider).nutrition.templates.first.n, 'Sandwich and coffee');
+      expect(find.text('Sandwich and coffee'), findsWidgets);
+
+      // Reopening it edits in place rather than making a second one.
+      await press(tester, find.text('Sandwich and coffee').first);
+      // Not 'Breakfast': the slot filter chips carry those four words, and a rename onto one of
+      // them makes `find.text` ambiguous rather than making the test fail for a real reason.
+      await tester.enterText(find.byType(AppTextField).first, 'Toast and coffee');
+      await tester.pumpAndSettle();
+      await press(tester, find.text('Save'));
+      expect(container.read(appStateProvider).nutrition.templates, hasLength(1));
+      expect(container.read(appStateProvider).nutrition.templates.first.n, 'Toast and coffee');
+
+      await press(tester, find.text('Toast and coffee').first);
+      await press(tester, find.text('Delete'));
+      expect(container.read(appStateProvider).nutrition.templates, isEmpty);
+      expect(tester.takeException(), isNull);
+      container.dispose();
+    });
+
+    testWidgets('a recipe reaches the nutrition screen as somewhere to go', (tester) async {
+      final container = await pump(tester, profiled(), '/nutrition');
+      expect(find.text('Recipes', skipOffstage: false), findsOneWidget);
+      container.dispose();
+    });
+
     testWidgets('the plan and copy-a-day rows are offered', (tester) async {
       final container = await pump(tester, profiled(), '/nutrition');
       expect(find.text('Plan my day', skipOffstage: false), findsOneWidget);
