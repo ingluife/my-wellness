@@ -19,6 +19,7 @@ import 'package:my_open_gym/ui/widgets/controls/fields.dart';
 import 'package:my_open_gym/ui/widgets/controls/stepper.dart';
 import 'package:my_open_gym/ui/widgets/controls/surfaces.dart';
 import 'package:my_open_gym/ui/widgets/macro_bar.dart';
+import 'package:my_open_gym/ui/widgets/tab_bar.dart';
 import 'package:my_open_gym/ui/widgets/media.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -173,12 +174,17 @@ void main() {
     container.dispose();
   });
 
-  testWidgets('the tab bar keeps Home lit rather than lighting nothing', (tester) async {
-    // /nutrition is not a tab; _isOn maps it onto Home the way /settings already is.
-    final container = await pump(tester, profiled(), '/nutrition');
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Nutrition'), findsWidgets);
-    container.dispose();
+  testWidgets('Nutrition is a tab, and its children keep it lit', (tester) async {
+    // It used to borrow Home's tab, because there was no tab of its own to light. There is now,
+    // and `current` is only the first path segment — so the two child screens light it too
+    // rather than dropping the bar back to nothing selected.
+    for (final path in ['/nutrition', '/nutrition/foods', '/nutrition/recipes']) {
+      final container = await pump(tester, profiled(), path);
+      final tab = tester.widget<AppTabBar>(find.byType(AppTabBar));
+      expect(tab.current, 'nutrition', reason: path);
+      expect(find.text('Nutrition'), findsWidgets, reason: path);
+      container.dispose();
+    }
   });
 
   testWidgets('the food library lists foods and sorts by protein density', (tester) async {
@@ -228,11 +234,23 @@ void main() {
     container.dispose();
   });
 
-  testWidgets('Settings offers the nutrition rows', (tester) async {
-    final container = await pump(tester, profiled(), '/settings');
-    expect(find.text('Food & meals', skipOffstage: false), findsOneWidget);
+  testWidgets('the nutrition screen owns its own setup rows', (tester) async {
+    // These used to live in a Nutrition section on Settings. Nutrition is a tab now and that
+    // section is gone, so the screen has to carry both of them itself — otherwise the profile
+    // and the goal become things you can only change from a sheet you have to know about.
+    final container = await pump(tester, profiled(), '/nutrition');
+    expect(find.text('About you', skipOffstage: false), findsWidgets);
     expect(find.text('Goal', skipOffstage: false), findsWidgets);
-    expect(find.text('Nutrition', skipOffstage: false), findsWidgets);
+    // The goal reads as the same summary line Settings used to show.
+    expect(find.text('Maintain', skipOffstage: false), findsWidgets);
+    container.dispose();
+  });
+
+  testWidgets('Settings no longer carries a nutrition section', (tester) async {
+    final container = await pump(tester, profiled(), '/settings');
+    expect(find.text('Food & meals', skipOffstage: false), findsNothing);
+    expect(find.text('About you', skipOffstage: false), findsNothing);
+    // 'Nutrition' itself is not asserted absent: the tab bar spells it out on every screen.
     container.dispose();
   });
 
@@ -557,7 +575,10 @@ void main() {
       // The rate row only exists once the goal is not "maintain".
       expect(find.text('Kilos per week'), findsOneWidget);
 
-      await tester.tap(find.text('Maintain'));
+      // `.last`, not a bare finder: the screen underneath now summarises the same goal in its
+      // own row, so 'Maintain' matches twice. The sheet is a route pushed over the screen, so
+      // it is the later of the two in the tree — which is the one a finger would reach.
+      await tester.tap(find.text('Maintain').last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       container.dispose();

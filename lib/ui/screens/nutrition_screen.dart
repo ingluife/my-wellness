@@ -279,7 +279,7 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
   Widget _weekCard2(BuildContext context, AppState s) {
     final c = context.c;
     final b = weekBudget(s, _iso);
-    final eaten = _weekMacros(s);
+    final eaten = weekMacros(s, _iso);
     final target = macroTargets(s, iso: _iso);
     if (target == null) return const SizedBox.shrink();
 
@@ -321,18 +321,6 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
         ],
       ),
     );
-  }
-
-  Macros _weekMacros(AppState s) {
-    var kcal = 0.0, p = 0.0, cb = 0.0, f = 0.0;
-    for (final d in weekDays(_iso)) {
-      final t = dayTotals(s, d);
-      kcal += t.kcal;
-      p += t.p;
-      cb += t.c;
-      f += t.f;
-    }
-    return (kcal: kcal, p: p, c: cb, f: f);
   }
 
   Widget _line(BuildContext context, String label, String value, {Color? tint}) {
@@ -486,6 +474,19 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
             subtitle: t('Age, height, activity'),
             accessory: RowAccessory.chevron,
             onTap: bodyProfileSheet,
+          ),
+          // The goal used to be summarised in Settings. Nutrition is a tab now and Settings has
+          // no nutrition section left, so the line reads here — next to its sibling, and next to
+          // the numbers it decides.
+          Consumer(
+            builder: (context, ref, _) => AppRow(
+              icon: 'target',
+              iconTint: context.c.acc,
+              title: t('Goal'),
+              subtitle: goalLine(ref.watch(appStateProvider)),
+              accessory: RowAccessory.chevron,
+              onTap: nutritionGoalSheet,
+            ),
           ),
         ]),
       );

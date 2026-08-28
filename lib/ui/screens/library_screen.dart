@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../domain/exercises.dart';
 import '../../domain/format.dart';
 import '../../domain/history.dart';
@@ -68,6 +70,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         PageHeader(
           title: t('Exercises'),
           subtitle: t('{0} exercises with animations', exdb.db.length),
+          // A detail screen rather than a tab since the bar gave its slot to Nutrition, so it
+          // carries the way back to the screen that now owns it.
+          leading: IconButtonRound('chevronLeft', onTap: () => context.go('/plan')),
         ),
         SearchField(
           controller: _search,

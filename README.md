@@ -28,7 +28,7 @@ the next time you photograph a plate. It is a real inference call and costs a fr
 
 | | |
 |---|---|
-| **Screens** | Home · Plan · Routine editor · Workout · Stats · History · Exercises · Settings · Login |
+| **Screens** | Home · Plan · Routine editor · Workout · Nutrition · Stats · History · Exercises · Settings · Login |
 | **Exercises** | 1,324, with an animation and a still for each, plus your own |
 | **Languages** | 12 (EN, DE, ES, FR, IT, PT, PL, TR, RU, ZH, KO, HI); instructions localised in 10 |
 | **Progression** | Linear · Greyskull LP · double progression · add-time · off, per routine or per exercise |

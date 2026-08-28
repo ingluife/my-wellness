@@ -62,13 +62,16 @@ class AppTabBar extends StatelessWidget {
   /// A running workout turns the disc orange and gives it a pulsing ring.
   final bool workoutRunning;
 
-  /// History is reached from Stats, and Settings and Nutrition from Home, so each keeps its
-  /// parent lit rather than leaving no tab selected at all.
+  /// History is reached from Stats, the exercise catalogue from Plan, and Settings from Home, so
+  /// each keeps its parent lit rather than leaving no tab selected at all.
+  ///
+  /// Nutrition needs no mapping of its own any more: it is a tab, and [current] is only the first
+  /// path segment, so `/nutrition/foods` and `/nutrition/recipes` light it too.
   bool _isOn(String key) =>
       current == key ||
       (current == 'history' && key == 'stats') ||
-      (current == 'settings' && key == 'home') ||
-      (current == 'nutrition' && key == 'home');
+      (current == 'library' && key == 'plan') ||
+      (current == 'settings' && key == 'home');
 
   @override
   Widget build(BuildContext context) {
@@ -126,10 +129,10 @@ class AppTabBar extends StatelessWidget {
                       onTap: () => onTap('/stats'),
                     ),
                     _Tab(
-                      icon: 'list',
-                      label: t('Exercises'),
-                      on: _isOn('library'),
-                      onTap: () => onTap('/library'),
+                      icon: 'meal',
+                      label: t('Nutrition'),
+                      on: _isOn('nutrition'),
+                      onTap: () => onTap('/nutrition'),
                     ),
                   ],
                 ),

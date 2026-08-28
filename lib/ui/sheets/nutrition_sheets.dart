@@ -230,6 +230,21 @@ Widget _error(BuildContext context, String message) => Padding(
 Future<void> nutritionGoalSheet() =>
     showSheet<void>((context, close) => _GoalSheet(close: close));
 
+/// "Lose 0.5 kg a week", or the mode alone when it has no rate.
+///
+/// Lives beside the sheet that edits it rather than in the screen that shows it: two screens now
+/// summarise the same goal, and a line that reads differently in each is a line that makes you
+/// check which one is right.
+String goalLine(AppState s) {
+  final g = s.nutrition.goal;
+  final mode = goalMode(g);
+  if (mode == 'maintain') return t('Maintain');
+  final rate = goalRate(g).abs();
+  return mode == 'cut'
+      ? t('Lose {0} kg a week', fmtNum(rate))
+      : t('Gain {0} kg a week', fmtNum(rate));
+}
+
 class _GoalSheet extends ConsumerStatefulWidget {
   const _GoalSheet({required this.close});
 

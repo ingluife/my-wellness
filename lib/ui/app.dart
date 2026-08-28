@@ -90,7 +90,6 @@ class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBinding
         accentFrom(accent),
       ),
       routerConfig: _router,
-      builder: (context, child) => AppShell(child: child ?? const SizedBox.shrink()),
     );
   }
 }
@@ -100,9 +99,13 @@ class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBinding
 /// They live outside the router so they survive navigation — checking Stats mid-rest must not
 /// stop the countdown, and the tab bar is always the way out of a screen that went wrong.
 class AppShell extends ConsumerWidget {
-  const AppShell({super.key, required this.child});
+  const AppShell({super.key, required this.child, required this.location});
 
   final Widget child;
+
+  /// The current path, handed down by the app rather than looked up here. See the comment on
+  /// the builder that supplies it.
+  final String location;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -116,7 +119,6 @@ class AppShell extends ConsumerWidget {
   }
 
   Widget _shell(BuildContext context, WidgetRef ref, UiController ui, bool active) {
-    final location = _locationOf(context);
     final timerShowing = ui.timer != null;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     // A Material ancestor, and the page's own background in one: text fields and anything else
@@ -139,7 +141,7 @@ class AppShell extends ConsumerWidget {
             right: 0,
             bottom: 0,
             child: AppTabBar(
-              current: location,
+              current: _tabKey,
               workoutRunning: active,
               onTap: (route) => appNavigatorKey.currentContext?.go(route),
               onStart: () => _start(context, ref, active),
@@ -177,9 +179,10 @@ class AppShell extends ConsumerWidget {
     appNavigatorKey.currentContext?.go('/workout');
   }
 
-  String _locationOf(BuildContext context) {
-    final path = GoRouter.maybeOf(context)?.state.uri.path ?? '/home';
-    final seg = path.split('/').where((s) => s.isNotEmpty);
+  /// The first path segment — 'nutrition' for `/nutrition/foods` as well as for `/nutrition`,
+  /// which is what lets a tab stay lit across its own child screens.
+  String get _tabKey {
+    final seg = location.split('/').where((s) => s.isNotEmpty);
     return seg.isEmpty ? 'home' : seg.first;
   }
 }

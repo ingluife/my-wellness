@@ -415,6 +415,19 @@ WeekBudget weekBudget(AppState s, String iso) {
   );
 }
 
+/// The week containing [iso], summed macro by macro — [weekBudget]'s calorie sum, broken out.
+Macros weekMacros(AppState s, String iso) {
+  var kcal = 0.0, p = 0.0, c = 0.0, f = 0.0;
+  for (final d in weekDays(iso)) {
+    final t = dayTotals(s, d);
+    kcal += t.kcal;
+    p += t.p;
+    c += t.c;
+    f += t.f;
+  }
+  return (kcal: kcal, p: p, c: c, f: f);
+}
+
 /// A stable key for "the same meal, logged again".
 ///
 /// Built from what was eaten and how much of it, so a breakfast repeated on Tuesday matches

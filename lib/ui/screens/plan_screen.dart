@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/app_state.dart';
+import '../../domain/exercises.dart';
 import '../../domain/format.dart';
 import '../../domain/glyphs.dart';
 import '../../domain/i18n.dart';
@@ -81,6 +82,21 @@ class PlanScreen extends ConsumerWidget {
           AppButton(t('Load starter plan (Push / Pull / Legs)'),
               icon: 'sparkles', onTap: () => loadStarterPlan(ref)),
         ],
+        // The catalogue's only door, now that it is not a tab. It belongs to this screen rather
+        // than to Settings: browsing it is something you do while building a routine, and the
+        // routines are the list directly above it.
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: ListItem(
+            leading: GlyphTile('list'),
+            onTap: () => context.go('/library'),
+            trailing: [AppIcon('chevronRight', size: 15, color: c.label, stroke: 2.4)],
+            child: ItemText(
+              t('Exercises'),
+              subtitle: t('{0} exercises with animations', exdb.db.length),
+            ),
+          ),
+        ),
       ],
     );
   }

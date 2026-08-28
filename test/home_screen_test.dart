@@ -43,7 +43,11 @@ void main() {
     expect(find.text('Load starter plan (PPL)'), findsOneWidget);
     expect(
         find.textContaining('No entries yet — log your weight to start the curve'), findsOneWidget);
-    expect(find.text('0 week streak'), findsOneWidget);
+    // The streak used to be one sentence ('0 week streak'); it is a stat tile now, with the
+    // label and the number as separate widgets — this checks a fresh profile still reads as
+    // zero rather than as broken or missing data.
+    expect(find.text('Week streak'), findsOneWidget);
+    expect(find.text('0'), findsWidgets);
     container.dispose();
   });
 
