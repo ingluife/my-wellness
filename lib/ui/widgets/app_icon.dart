@@ -98,7 +98,9 @@ class AppIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!_icons.containsKey(name)) return const SizedBox.shrink();
+    // `_all`, not `_icons`: the food glyphs live in the other half of the merged map, and
+    // guarding on the generated half alone made every one of them draw nothing at all.
+    if (!_all.containsKey(name)) return const SizedBox.shrink();
     final ds = DefaultTextStyle.of(context).style;
     final s = size ?? ds.fontSize ?? 17;
     return SizedBox(
