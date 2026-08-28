@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -89,6 +90,7 @@ void main() {
   Future<ProviderContainer> pump(
     WidgetTester tester, {
     AiResult? result,
+    AiProvider? provider,
     AppState? initial,
     bool cancelPicker = false,
   }) async {
@@ -97,7 +99,10 @@ void main() {
       photoCaptureProvider
           .overrideWithValue(MemoryPhotoCapture(cancelPicker ? null : jpeg)),
       mealPhotoStoreProvider.overrideWithValue(photos),
-      if (result != null) aiMealPhotoProvider.overrideWithValue(_FakeVision(result)),
+      if (provider != null)
+        aiMealPhotoProvider.overrideWithValue(provider)
+      else if (result != null)
+        aiMealPhotoProvider.overrideWithValue(_FakeVision(result)),
     ]);
     container.read(appStateProvider.notifier).replaceState(initial ?? onState());
     await tester.pumpWidget(
@@ -224,6 +229,33 @@ void main() {
 
     // The whole design in one assertion: a draft on screen, and a log still untouched.
     expect(container.read(appStateProvider).meals, isEmpty);
+    container.dispose();
+  });
+
+  testWidgets('the thinking phase says what it is doing while it waits', (tester) async {
+    // A provider that never resolves on its own: shoot()'s pumpAndSettle would blow straight
+    // through the thinking phase the instant _FakeVision answers, and there would be nothing
+    // left to look at.
+    final pending = Completer<AiResult>();
+    final container = await pump(tester, provider: _PendingVision(pending.future));
+
+    await press(tester, find.text('Log from a photo', skipOffstage: false).last);
+    await tester.tap(find.text('Take a photo'));
+    // Not pumpAndSettle: the bar's animation repeats forever by design and would never let
+    // pumpAndSettle return. A couple of plain pumps is enough to catch it mid-flight.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Reading the photo'), findsOneWidget);
+    expect(find.text('Analyzing your photo…'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    pending.complete(AiDraft(answer([
+      {'fid': chicken.id, 'name': 'Chicken', 'grams': 200},
+    ])));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Check what you ate'), findsOneWidget);
     container.dispose();
   });
 
@@ -537,4 +569,21 @@ class _FakeVision implements AiProvider {
 
   @override
   Future<AiResult> run(AiRequest request) async => result;
+}
+
+/// Answers only when its caller completes [result] — the one state `_FakeVision`'s instant
+/// resolution never leaves a test time to observe.
+class _PendingVision implements AiProvider {
+  const _PendingVision(this.result);
+
+  final Future<AiResult> result;
+
+  @override
+  bool get isAvailable => true;
+
+  @override
+  String get label => 'Claude Opus 5';
+
+  @override
+  Future<AiResult> run(AiRequest request) => result;
 }

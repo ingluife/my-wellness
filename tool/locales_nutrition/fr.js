@@ -21,6 +21,7 @@ export default {
   "Age, height, activity": "Âge, taille, activité",
   "All foods": "Tous les aliments",
   "An example day that hits your target": "Un exemple de journée qui atteint ton objectif",
+  "Analyzing your photo…": "Analyse de ta photo…",
   "Any meal": "N'importe quel repas",
   "Anything": "Peu importe",
   "Between {0} and {1}": "Entre {0} et {1}",

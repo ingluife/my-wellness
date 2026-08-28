@@ -21,6 +21,7 @@ export default {
   "Age, height, activity": "उम्र, कद, गतिविधि",
   "All foods": "सभी खाद्य पदार्थ",
   "An example day that hits your target": "एक नमूना दिन जो आपका लक्ष्य पूरा करता है",
+  "Analyzing your photo…": "आपकी फ़ोटो का विश्लेषण हो रहा है…",
   "Any meal": "कोई भी भोजन",
   "Anything": "कुछ भी",
   "Between {0} and {1}": "{0} और {1} के बीच",

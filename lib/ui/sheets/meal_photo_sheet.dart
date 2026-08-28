@@ -236,8 +236,11 @@ class _MealPhotoSheetState extends ConsumerState<_MealPhotoSheet> {
         if (_photo != null) _preview(_photo!, 160),
         const SizedBox(height: 14),
         // Not a CircularProgressIndicator: nothing in this app is a stock Material widget.
-        MacroSplit(macros: (kcal: 1, p: 1, c: 1, f: 1), height: 4),
+        const _ThinkingBar(),
         const SizedBox(height: 10),
+        Text(t('Analyzing your photo…'),
+            textAlign: TextAlign.center, style: ts(TypeScale.head, color: c.label)),
+        const SizedBox(height: 2),
         Text(ref.read(aiMealPhotoProvider).label,
             textAlign: TextAlign.center, style: ts(TypeScale.foot, color: c.label3)),
         const SizedBox(height: 14),
@@ -412,6 +415,63 @@ class _MealPhotoSheetState extends ConsumerState<_MealPhotoSheet> {
         }),
         const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+/// A bar of light sweeping across a track, in place of a spinner.
+///
+/// The request has no progress to report — one HTTP round trip, done or not — so this promises
+/// motion, not a percentage. Same track shape as [MacroSplit] since it sits in that widget's
+/// spot, but this one has to drive its own animation rather than read one from data.
+class _ThinkingBar extends StatefulWidget {
+  const _ThinkingBar();
+
+  @override
+  State<_ThinkingBar> createState() => _ThinkingBarState();
+}
+
+class _ThinkingBarState extends State<_ThinkingBar> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    const sweep = .32;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(99),
+      child: SizedBox(
+        height: 4,
+        child: ColoredBox(
+          color: c.surface3,
+          child: LayoutBuilder(
+            builder: (context, box) => AnimatedBuilder(
+              animation: _c,
+              builder: (context, _) {
+                final v = Motion.ease.transform(_c.value);
+                final w = box.maxWidth * sweep;
+                final x = (box.maxWidth + w) * v - w;
+                return Transform.translate(
+                  offset: Offset(x, 0),
+                  child: SizedBox(width: w, child: ColoredBox(color: c.acc)),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

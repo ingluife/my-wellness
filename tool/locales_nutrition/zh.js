@@ -21,6 +21,7 @@ export default {
   "Age, height, activity": "年龄、身高、活动量",
   "All foods": "全部食物",
   "An example day that hits your target": "一个达成目标的示例日",
+  "Analyzing your photo…": "正在分析你的照片…",
   "Any meal": "任意一餐",
   "Anything": "都可以",
   "Between {0} and {1}": "{0} 到 {1} 之间",

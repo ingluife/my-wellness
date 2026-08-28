@@ -21,6 +21,7 @@ export default {
   "Age, height, activity": "Yaş, boy, aktivite",
   "All foods": "Tüm besinler",
   "An example day that hits your target": "Hedefini tutturan örnek bir gün",
+  "Analyzing your photo…": "Fotoğrafın analiz ediliyor…",
   "Any meal": "Herhangi bir öğün",
   "Anything": "Fark etmez",
   "Between {0} and {1}": "{0} ile {1} arasında",

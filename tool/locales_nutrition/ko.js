@@ -21,6 +21,7 @@ export default {
   "Age, height, activity": "나이, 키, 활동량",
   "All foods": "모든 음식",
   "An example day that hits your target": "목표를 채우는 하루 예시",
+  "Analyzing your photo…": "사진을 분석하는 중…",
   "Any meal": "아무 끼니",
   "Anything": "아무거나",
   "Between {0} and {1}": "{0}에서 {1} 사이",

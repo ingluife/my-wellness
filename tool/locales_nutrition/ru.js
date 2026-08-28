@@ -21,6 +21,7 @@ export default {
   "Age, height, activity": "Возраст, рост, активность",
   "All foods": "Все продукты",
   "An example day that hits your target": "Пример дня, который попадает в твою цель",
+  "Analyzing your photo…": "Анализируем твоё фото…",
   "Any meal": "Любой приём пищи",
   "Anything": "Любая",
   "Between {0} and {1}": "От {0} до {1}",
