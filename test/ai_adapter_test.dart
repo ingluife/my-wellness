@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_open_gym/data/ai/ai_key_store.dart';
 import 'package:my_open_gym/data/ai/anthropic_adapter.dart';
 import 'package:my_open_gym/domain/ai/ai_provider.dart';
+import 'package:my_open_gym/domain/ai/meal_photo_prompt.dart';
 
 /// The wire format, and the handling of everything that can come back down it.
 ///
@@ -23,11 +24,15 @@ void main() {
 
   final jpeg = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 0xFF, 0xD9]);
 
-  AiRequest req({String? hint, String customFoods = '', String language = 'English'}) => AiRequest(
+  /// Built through the feature's own composer rather than by hand, so these tests pin the bytes
+  /// the app actually sends — the adapter renders an envelope, but which half carries the
+  /// catalogue and which carries the language is `meal_photo_prompt.dart`'s decision.
+  AiRequest req({String? hint, String customFoods = '', String language = 'English'}) =>
+      mealPhotoRequest(
         jpeg: jpeg,
         vocabulary: '# protein\nf0001 Chicken breast',
         customFoods: customFoods,
-        language: language,
+        languageName: language,
         hint: hint,
       );
 
@@ -127,7 +132,7 @@ void main() {
         }),
       );
 
-      await a.readMeal(req());
+      await a.run(req());
       expect(seen.headers['x-api-key'], secret);
       expect(seen.headers['anthropic-version'], '2023-06-01');
       expect(seen.url.toString(), 'https://api.anthropic.com/v1/messages');
@@ -144,7 +149,7 @@ void main() {
         }),
       );
 
-      final r = await a.readMeal(req());
+      final r = await a.run(req());
       expect(r, isA<AiFailure>());
       expect((r as AiFailure).kind, AiFailureKind.notConfigured);
       expect(called, isFalse, reason: 'a request with no key is a wasted round trip');
@@ -167,7 +172,7 @@ void main() {
           client: _FakeClient((_) => outcome() as http.Response),
         );
 
-        final r = await a.readMeal(req());
+        final r = await a.run(req());
         expect(r, isA<AiFailure>());
         // Note what this does and does not prove. It proves no path out of the adapter renders
         // the key, including the bare catch. It does not prove a future field could not carry it
@@ -186,7 +191,7 @@ void main() {
         keys: MemoryAiKeyStore(const {'anthropic': secret}),
         client: _FakeClient((_) => f() as http.Response),
       );
-      return a.readMeal(req());
+      return a.run(req());
     }
 
     Future<AiFailureKind> kindOf(Object Function() f) async =>
@@ -313,12 +318,19 @@ void main() {
       // A real plate is ~100–180 KB and about a thousand image tokens; this is a rounding error.
       expect(bytes.length, lessThan(1024));
 
-      // The catalogue is the expensive half of a real request, and the probe sends an empty one.
-      // That, and the image above, are what make a test cost a fraction of what a photo does —
-      // which is the claim the settings screen prints next to the button.
-      final prefix = ((sent['system'] as List).first as Map)['text'] as String;
-      expect(prefix, contains('<catalogue>\n\n</catalogue>'));
-      expect(prefix, isNot(contains('Chicken breast')));
+      // A catalogue is the expensive half of a real request, and the probe carries none at all.
+      // That, and the image above, are what make a test cost a fraction of what a real call does
+      // — which is the claim the settings screen prints next to the button. Asserted as a size
+      // rather than by naming any one feature's block, because the probe is shared by all of
+      // them: whatever gets added here later still has to stay this small.
+      final prompt = [
+        for (final block in sent['system'] as List) (block as Map)['text'] as String,
+      ].join();
+      expect(prompt.length, lessThan(400));
+      expect(prompt, isNot(contains('Chicken breast')));
+      // Small answer too — a probe that let a model write for 1,500 tokens would cost more than
+      // the request it is testing.
+      expect(sent['max_tokens'], lessThan(100));
     });
 
     test('null means it worked, and the answer is never read', () async {

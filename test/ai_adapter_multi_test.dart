@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_open_gym/data/ai/ai_key_store.dart';
 import 'package:my_open_gym/data/ai/gemini_adapter.dart';
 import 'package:my_open_gym/data/ai/openai_adapter.dart';
-import 'package:my_open_gym/data/ai/vision_adapter.dart';
+import 'package:my_open_gym/data/ai/ai_adapter.dart';
 import 'package:my_open_gym/domain/ai/ai_provider.dart';
 import 'package:my_open_gym/domain/ai/meal_photo_prompt.dart';
 
@@ -33,12 +33,29 @@ void main() {
 
   final jpeg = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0, 7, 8, 9, 0xFF, 0xD9]);
 
-  AiRequest req({String? hint}) => AiRequest(
+  AiRequest req({String? hint}) => mealPhotoRequest(
         jpeg: jpeg,
         vocabulary: '# protein\nf0001 Chicken breast',
         customFoods: 'cf1 My shake',
-        language: 'Spanish',
+        languageName: 'Spanish',
         hint: hint,
+      );
+
+  /// A text-only request, which is what every feature other than the meal photo sends. Neither
+  /// provider may grow an empty image part for one.
+  AiRequest textReq() => const AiRequest(
+        systemPrefix: 'You draft things.',
+        systemTail: 'Answer in Spanish.',
+        userText: 'Draft it.',
+        schema: {
+          'type': 'object',
+          'properties': {
+            'ok': {'type': 'boolean'},
+          },
+          'required': ['ok'],
+        },
+        schemaName: 'draft',
+        answerTokens: 900,
       );
 
   const goodAnswer = {
@@ -65,7 +82,7 @@ void main() {
         }),
       );
 
-      await a.readMeal(req());
+      await a.run(req());
       // The model id is in the URL here, not the body — the one structural difference from the
       // other two adapters, and easy to lose in a refactor that treats endpoints as constants.
       expect(
@@ -173,7 +190,7 @@ void main() {
         keys: MemoryAiKeyStore(const {'google': secret}),
         client: _FakeClient((_) => http.Response(body, status)),
       );
-      return a.readMeal(req());
+      return a.run(req());
     }
 
     test('finds the text in the first candidate', () async {
@@ -243,7 +260,7 @@ void main() {
         }),
       );
 
-      await a.readMeal(req());
+      await a.run(req());
       expect(seen.url.toString(), 'https://api.openai.com/v1/responses');
       expect(seen.headers['Authorization'], 'Bearer $secret');
       // Not chat completions. The whole body shape below depends on this being right.
@@ -305,7 +322,7 @@ void main() {
         keys: MemoryAiKeyStore(const {'openai': secret}),
         client: _FakeClient((_) => http.Response(body, status)),
       );
-      return a.readMeal(req());
+      return a.run(req());
     }
 
     test('finds the output_text part', () async {
@@ -354,7 +371,7 @@ void main() {
           (429, AiFailureKind.rateLimited),
           (503, AiFailureKind.providerDown),
         ]) {
-          final r = await build(status).readMeal(req());
+          final r = await build(status).run(req());
           expect((r as AiFailure).kind, kind);
         }
       }
@@ -367,18 +384,18 @@ void main() {
         return http.Response('{}', 200);
       });
 
-      for (final a in <HttpVisionAdapter>[
+      for (final a in <HttpAiAdapter>[
         GeminiAdapter(model: gemini, keys: MemoryAiKeyStore(), client: client),
         OpenAiAdapter(model: openai, keys: MemoryAiKeyStore(), client: client),
       ]) {
-        final r = await a.readMeal(req());
+        final r = await a.run(req());
         expect((r as AiFailure).kind, AiFailureKind.notConfigured);
       }
       expect(called, isFalse);
     });
 
     test('the key never appears in a failure from either adapter', () async {
-      for (final a in <HttpVisionAdapter>[
+      for (final a in <HttpAiAdapter>[
         GeminiAdapter(
             model: gemini,
             keys: MemoryAiKeyStore(const {'google': secret}),
@@ -388,9 +405,36 @@ void main() {
             keys: MemoryAiKeyStore(const {'openai': secret}),
             client: _FakeClient((_) => http.Response('{"error":"bad key $secret"}', 401))),
       ]) {
-        final r = await a.readMeal(req());
+        final r = await a.run(req());
         expect(r.toString(), isNot(contains(secret)));
       }
+    });
+
+    // The envelope carries an optional image so features that are not about photographs can use
+    // the same three adapters. What that must not do is leave a hole where the image was: an
+    // empty image part is a 400 from both of these, and it would only ever be hit by the feature
+    // that has no photo to send.
+    test('a text-only request grows no empty image part', () {
+      final g = buildGeminiBody(textReq(), gemini);
+      final gParts = ((g['contents'] as List).single as Map)['parts'] as List;
+      expect(gParts, hasLength(1));
+      expect((gParts.single as Map).containsKey('inline_data'), isFalse);
+      expect(gParts.single, contains('text'));
+
+      final o = buildOpenAiBody(textReq(), openai);
+      final oUser = (o['input'] as List).last as Map;
+      final oParts = oUser['content'] as List;
+      expect(oParts, hasLength(1));
+      expect((oParts.single as Map)['type'], 'input_text');
+    });
+
+    test('the answer budget is the feature\'s, plus each provider\'s reasoning headroom', () {
+      // Thinking tokens are charged against the same ceiling as the answer on both of these, so
+      // a feature that asks for 900 tokens of JSON and gets a 900 ceiling gets truncated JSON.
+      expect(buildGeminiBody(textReq(), gemini)['generationConfig'],
+          containsPair('maxOutputTokens', 900 + GeminiAdapter.reasoningHeadroom));
+      expect(buildOpenAiBody(textReq(), openai)['max_output_tokens'],
+          900 + OpenAiAdapter.reasoningHeadroom);
     });
   });
 

@@ -79,11 +79,11 @@ class _MealPhotoSheetState extends ConsumerState<_MealPhotoSheet> {
     });
 
     final s = ref.read(appStateProvider);
-    final result = await ref.read(aiMealPhotoProvider).readMeal(AiRequest(
+    final result = await ref.read(aiMealPhotoProvider).run(mealPhotoRequest(
           jpeg: bytes,
           vocabulary: _vocabulary(),
           customFoods: buildCustomFoods(s.nutrition.foods),
-          language: langs[s.lang] ?? 'English',
+          languageName: langs[s.lang] ?? 'English',
         ));
 
     if (!mounted) return;

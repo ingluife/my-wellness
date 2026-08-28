@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import '../../data/models/app_state.dart';
 import '../foods.dart';
+import 'ai_provider.dart';
 
 /// What the model is asked, and the vocabulary it is asked to answer in.
 ///
@@ -157,3 +160,36 @@ String buildRequestTail({
   }
   return b.toString().trimRight();
 }
+
+/// Everything above, assembled into the request an adapter sends.
+///
+/// The composition lives here rather than in the three adapters because the exact bytes are this
+/// feature's business: the `<catalogue>` tags, which half carries the breakpoint, and the order
+/// of the two blocks are all part of the caching design documented on [buildVocabulary] and
+/// [buildRequestTail]. An adapter only decides how to render a prefix, a tail and an image into
+/// its own envelope.
+AiRequest mealPhotoRequest({
+  required Uint8List jpeg,
+  required String vocabulary,
+  required String languageName,
+  String customFoods = '',
+  String? hint,
+}) =>
+    AiRequest(
+      systemPrefix: '${mealPhotoInstructions.trim()}\n\n<catalogue>\n$vocabulary\n</catalogue>',
+      systemTail: buildRequestTail(
+        languageName: languageName,
+        customFoods: customFoods,
+        hint: hint,
+      ),
+      userText: 'Read this meal.',
+      jpeg: jpeg,
+      schema: mealPhotoSchema,
+      schemaName: 'meal_photo',
+      // Twelve items at roughly 60 tokens each, with headroom. Small on purpose: the answer is a
+      // short structured list, and a large ceiling buys nothing but a longer worst case.
+      answerTokens: 1500,
+      // Worth it here, and one of the few places it is: people photograph three or four meals in
+      // a sitting, minutes apart, so the catalogue prefix is genuinely still warm.
+      cachePrefix: true,
+    );

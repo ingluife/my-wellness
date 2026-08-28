@@ -107,12 +107,16 @@ void main() {
   testWidgets('the feature cannot be switched on before a key exists', (tester) async {
     final (container, _) = await pump(tester);
 
-    final sw = tester.widget<AppSwitch>(find.byType(AppSwitch).first);
-    expect(sw.enabled, isFalse,
-        reason: 'a switch that turns on with no key builds a setting that fails on first use');
-
-    expect(find.text('Add a key above first'), findsOneWidget);
-    expect(container.read(appStateProvider).ai.features[aiMealPhoto]?.isOn ?? false, isFalse);
+    // Every feature, not just the first: each one is its own switch and its own way to build a
+    // setting that looks complete and fails on first use.
+    for (final sw in tester.widgetList<AppSwitch>(find.byType(AppSwitch))) {
+      expect(sw.enabled, isFalse,
+          reason: 'a switch that turns on with no key builds a setting that fails on first use');
+    }
+    expect(find.text('Add a key above first'), findsNWidgets(aiFeatures.length));
+    for (final f in aiFeatures) {
+      expect(container.read(appStateProvider).ai.features[f]?.isOn ?? false, isFalse, reason: f);
+    }
     container.dispose();
   });
 
@@ -239,7 +243,7 @@ void main() {
     expect(find.text('OpenAI'), findsOneWidget);
 
     await press(tester, find.text('Log a meal from a photo'));
-    await press(tester, find.text('Provider'));
+    await press(tester, find.text('Provider').first);
 
     expect(find.text('Google'), findsWidgets, reason: 'the key row and the chooser entry');
     // Still one each: the two without a key were not offered.
@@ -316,9 +320,9 @@ void main() {
       initial: initial,
     );
 
-    await press(tester, find.text('Provider'));
+    await press(tester, find.text('Provider').first);
     await press(tester, find.text('Anthropic').last);
-    await press(tester, find.text('Provider'));
+    await press(tester, find.text('Provider').first);
     await press(tester, find.text('Google').last);
 
     expect(container.read(appStateProvider).ai.feature(aiMealPhoto).models['google'],

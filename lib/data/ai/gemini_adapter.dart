@@ -1,8 +1,7 @@
 import 'dart:convert';
 
 import '../../domain/ai/ai_provider.dart';
-import '../../domain/ai/meal_photo_prompt.dart';
-import 'vision_adapter.dart';
+import 'ai_adapter.dart';
 
 /// Google's Gemini API, through `models.{id}:generateContent`.
 ///
@@ -22,13 +21,14 @@ import 'vision_adapter.dart';
 /// `generationConfig` holding `response_mime_type` / `response_schema`. Proto3 JSON accepts both
 /// casings for every one of these; the documented example mixes them exactly as this does, so it
 /// is copied rather than tidied.
-class GeminiAdapter extends HttpVisionAdapter {
+class GeminiAdapter extends HttpAiAdapter {
   GeminiAdapter({required super.model, required super.keys, super.client});
 
-  /// Gemini 3.7 Flash thinks, and thinking tokens count against this ceiling — so it is set well
-  /// above what the answer itself needs. A limit that a model's reasoning eats before it reaches
-  /// the JSON truncates the answer rather than shortening it.
-  static const maxOutputTokens = 4000;
+  /// Gemini 3.7 Flash thinks, and thinking tokens count against the same ceiling as the answer —
+  /// so the request's answer budget is not the number to send. A limit that a model's reasoning
+  /// eats before it reaches the JSON truncates the answer rather than shortening it, so this is
+  /// added on top of whatever the feature asked for.
+  static const reasoningHeadroom = 2500;
 
   @override
   String get providerId => 'google';
@@ -84,7 +84,7 @@ class GeminiAdapter extends HttpVisionAdapter {
     for (final part in parts) {
       if (part is! Map || part['thought'] == true) continue;
       if (part['text'] is String) {
-        return HttpVisionAdapter.payloadOf(part['text'] as String);
+        return HttpAiAdapter.payloadOf(part['text'] as String);
       }
     }
     return const AiFailure(AiFailureKind.unreadable);
@@ -101,28 +101,24 @@ Map<String, dynamic> buildGeminiBody(AiRequest request, AiModel model) => {
       // SDKs', which take a plain string and wrap it for you.
       'system_instruction': {
         'parts': [
-          {
-            'text':
-                '${mealPhotoInstructions.trim()}\n\n<catalogue>\n${request.vocabulary}\n</catalogue>',
-          }
+          {'text': request.systemPrefix}
         ],
       },
       'contents': [
         {
           'role': 'user',
           'parts': [
-            {
-              'inline_data': {
-                'mime_type': 'image/jpeg',
-                'data': base64Encode(request.jpeg),
+            if (request.jpeg != null)
+              {
+                'inline_data': {
+                  'mime_type': 'image/jpeg',
+                  'data': base64Encode(request.jpeg!),
+                },
               },
-            },
             {
-              'text': '${buildRequestTail(
-                languageName: request.language,
-                customFoods: request.customFoods,
-                hint: request.hint,
-              )}\n\nRead this meal.',
+              'text': request.systemTail.isEmpty
+                  ? request.userText
+                  : '${request.systemTail}\n\n${request.userText}',
             },
           ],
         },
@@ -135,12 +131,12 @@ Map<String, dynamic> buildGeminiBody(AiRequest request, AiModel model) => {
       'generationConfig': {
         'responseMimeType': 'application/json',
         // Translated, not passed through — see [geminiSchema].
-        'responseSchema': geminiSchema(mealPhotoSchema),
-        'maxOutputTokens': GeminiAdapter.maxOutputTokens,
+        'responseSchema': geminiSchema(request.schema),
+        'maxOutputTokens': request.answerTokens + GeminiAdapter.reasoningHeadroom,
       },
     };
 
-/// [mealPhotoSchema] in the dialect `response_schema` actually speaks.
+/// A request's schema in the dialect `response_schema` actually speaks.
 ///
 /// `response_schema` is not JSON Schema. It is Google's OpenAPI-3.0-derived `Schema` message, and
 /// the REST reference's own example spells its types in upper case — `"type": "ARRAY"`,

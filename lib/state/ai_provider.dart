@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/ai/ai_adapter.dart';
 import '../data/ai/ai_key_store.dart';
 import '../data/ai/anthropic_adapter.dart';
 import '../data/ai/gemini_adapter.dart';
 import '../data/ai/openai_adapter.dart';
-import '../data/ai/vision_adapter.dart';
 import '../data/models/app_state.dart';
 import '../domain/ai/ai_provider.dart';
 import '../platform/photo_capture.dart';
@@ -34,17 +34,22 @@ final aiConfiguredProvider = FutureProvider<Set<String>>(
   (ref) => ref.watch(aiKeyStoreProvider).configured(),
 );
 
-/// The provider that answers meal photos, or [DisabledAi] when the feature cannot run.
+/// The adapter for [featureId], or [DisabledAi] when that feature cannot run.
 ///
 /// Resolution order matters and is all negative: off, or no provider chosen, or no key for the
 /// one chosen, or no adapter in this build — each of those is a reason to hand back [DisabledAi]
 /// rather than something that will fail later. `isAvailable` is what the UI gates on, so a "no"
 /// here is what keeps the entry point absent instead of dead.
 ///
-/// Anthropic is the only provider wired up so far; the other two resolve to [DisabledAi] until
-/// their adapters land, which is why the settings screen only offers a provider that has a key.
-final aiMealPhotoProvider = Provider<AiVisionProvider>((ref) {
-  final cfg = ref.watch(appStateProvider.select((s) => s.ai.features[aiMealPhoto]?.copy()));
+/// Written once and shared by every feature's provider below. Each feature is configured
+/// separately — its own switch, its own provider, its own model — so the gates run per feature;
+/// what they must not do is drift apart, which is exactly what a second hand-copied set of them
+/// would eventually do.
+///
+/// All three providers in [aiProviders] have an adapter behind them — see [adapterFor], which
+/// `ai_adapter_multi_test.dart` guards against the picker and the switch drifting apart.
+AiProvider _gate(Ref ref, String featureId) {
+  final cfg = ref.watch(appStateProvider.select((s) => s.ai.features[featureId]?.copy()));
   if (cfg == null || !cfg.isOn) return const DisabledAi();
 
   final providerId = cfg.provider;
@@ -64,14 +69,20 @@ final aiMealPhotoProvider = Provider<AiVisionProvider>((ref) {
   final adapter = adapterFor(providerId, model, ref.watch(aiKeyStoreProvider));
   ref.onDispose(adapter.close);
   return adapter;
-});
+}
+
+/// The provider that reads meal photographs.
+final aiMealPhotoProvider = Provider<AiProvider>((ref) => _gate(ref, aiMealPhoto));
+
+/// The provider that drafts workout routines.
+final aiWorkoutPlanProvider = Provider<AiProvider>((ref) => _gate(ref, aiWorkoutPlan));
 
 /// The adapter for [providerId], with no regard for whether the feature is switched on.
 ///
 /// Shared by [aiMealPhotoProvider] and [aiProbeProvider] so there is one list of which id maps to
 /// which adapter. A second copy of this switch is how a provider gets added to the picker and
 /// forgotten in the test path.
-HttpVisionAdapter adapterFor(String providerId, AiModel model, AiKeyStore keys) =>
+HttpAiAdapter adapterFor(String providerId, AiModel model, AiKeyStore keys) =>
     switch (providerId) {
       'anthropic' => AnthropicAdapter(model: model, keys: keys),
       'google' => GeminiAdapter(model: model, keys: keys),

@@ -524,7 +524,7 @@ void main() {
 }
 
 /// Returns canned raw JSON, so the real sanitizer runs in every test above.
-class _FakeVision implements AiVisionProvider {
+class _FakeVision implements AiProvider {
   const _FakeVision(this.result);
 
   final AiResult result;
@@ -536,5 +536,5 @@ class _FakeVision implements AiVisionProvider {
   String get label => 'Claude Opus 5';
 
   @override
-  Future<AiResult> readMeal(AiRequest request) async => result;
+  Future<AiResult> run(AiRequest request) async => result;
 }

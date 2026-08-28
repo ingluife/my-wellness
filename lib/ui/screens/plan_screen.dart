@@ -7,7 +7,9 @@ import '../../domain/exercises.dart';
 import '../../domain/format.dart';
 import '../../domain/glyphs.dart';
 import '../../domain/i18n.dart';
+import '../../state/ai_provider.dart';
 import '../../state/app_state_provider.dart';
+import '../sheets/plan_ai_sheet.dart';
 import '../sheets/plan_sheets.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_icon.dart';
@@ -63,6 +65,10 @@ class PlanScreen extends ConsumerWidget {
           trailing: AppButton(t('New'),
               size: BtnSize.sm, variant: BtnVariant.tinted, icon: 'plus', onTap: addRoutine),
         ),
+        // Honest when it is off rather than absent: a row saying "set this up" is better than a
+        // feature nobody finds, and better than a button that fails on the first tap. Same
+        // pattern the nutrition screen uses for meal photos.
+        _draftRow(context, ref),
         if (s.routines.isNotEmpty)
           AppList(children: [
             for (final r in s.routines)
@@ -98,6 +104,26 @@ class PlanScreen extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  /// The AI drafting entry point, which is a different row depending on whether it can run.
+  Widget _draftRow(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final on = ref.watch(aiWorkoutPlanProvider).isAvailable;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ListItem(
+        leading: GlyphTile('sparkles', background: on ? c.acc : c.surface3),
+        onTap: () => on ? aiPlanSheet(ref) : context.go('/settings/ai'),
+        trailing: [AppIcon('chevronRight', size: 15, color: c.label, stroke: 2.4)],
+        child: ItemText(
+          on ? t('Draft a routine with AI') : t('Set up AI routines'),
+          subtitle: on
+              ? t('From your goals, using the exercises already here')
+              : t('Use your own AI provider to draft a routine'),
+        ),
+      ),
     );
   }
 }

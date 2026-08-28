@@ -22,8 +22,8 @@ import 'ai_key_store.dart';
 ///     object, never in a message.
 ///  3. **No provider response body is ever surfaced.** Providers echo request fragments back in
 ///     their errors. Map the status code and discard the rest.
-abstract class HttpVisionAdapter implements AiVisionProvider {
-  HttpVisionAdapter({
+abstract class HttpAiAdapter implements AiProvider {
+  HttpAiAdapter({
     required this.model,
     required AiKeyStore keys,
     http.Client? client,
@@ -50,8 +50,9 @@ abstract class HttpVisionAdapter implements AiVisionProvider {
 
   /// The decoded 200 body, as this provider shapes it, turned into a result.
   ///
-  /// Returns the raw payload the model produced, unvalidated — sanitising is
-  /// `meal_photo_sanitize.dart`'s job, it is pure, and it is where every bound is tested.
+  /// Returns the raw payload the model produced, unvalidated — sanitising belongs to the
+  /// feature (`meal_photo_sanitize.dart`, `plan_sanitize.dart`), it is pure, and it is where
+  /// every bound is tested.
   AiResult parse(Map<String, dynamic> decoded);
 
   @override
@@ -65,7 +66,7 @@ abstract class HttpVisionAdapter implements AiVisionProvider {
   void close() => _client.close();
 
   @override
-  Future<AiResult> readMeal(AiRequest request) async {
+  Future<AiResult> run(AiRequest request) async {
     final key = await _keys.read(providerId);
     if (key == null) return const AiFailure(AiFailureKind.notConfigured);
 
@@ -128,19 +129,29 @@ abstract class HttpVisionAdapter implements AiVisionProvider {
     }
   }
 
-  /// What [probe] sends: an ordinary meal read, around a 64x64 flat grey photograph and an empty
-  /// catalogue.
+  /// What [probe] sends: the smallest request that still exercises every part of the shape —
+  /// a system prompt, a user turn, a 64x64 flat grey photograph, and a JSON schema.
   ///
-  /// Small on purpose in both halves. The image is a handful of tokens rather than the ~1,050 a
-  /// real plate costs, and an empty vocabulary keeps the prompt at a few hundred tokens instead of
-  /// a few thousand — so the test lands at a fraction of what a photo costs while still travelling
-  /// the identical code path. The model will answer that this is not food, and [probe] does not
-  /// read the answer.
+  /// Small on purpose in every half. The image is a handful of tokens rather than the ~1,050 a
+  /// real plate costs, and the prompt is two sentences instead of a catalogue — so the test lands
+  /// at a fraction of a cent while still travelling the identical code path. It keeps the image
+  /// even though most features are text-only: a probe that dropped it would stop proving the
+  /// attachment shape, which is one of the things that silently rots when a provider moves on.
+  /// [probe] does not read the answer.
   static final probeRequest = AiRequest(
+    systemPrefix: 'You answer with JSON.',
+    userText: 'Reply with {"ok": true}.',
     jpeg: _probeJpeg,
-    vocabulary: '',
-    customFoods: '',
-    language: 'English',
+    schemaName: 'probe',
+    schema: const {
+      'type': 'object',
+      'properties': {
+        'ok': {'type': 'boolean'},
+      },
+      'required': ['ok'],
+      'additionalProperties': false,
+    },
+    answerTokens: 16,
   );
 
   /// 64x64, mid-grey, quality 40, already stripped — 305 bytes.

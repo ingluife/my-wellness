@@ -54,11 +54,23 @@ class AiModel {
   /// would mean the cheapest option in the picker is the one that never works.
   final bool supportsEffort;
 
-  /// Rough dollars for one meal photo: ~1,050 image tokens + ~2k of prompt, ~400 out.
+  /// Rough dollars for a call of this shape.
   ///
   /// Deliberately an estimate and rounded as one. The honest thing to show a user who is about to
   /// spend their own money is an order of magnitude, not a figure that looks like a bill.
-  double get perPhoto => (3050 * price.inPerM + 400 * price.outPerM) / 1000000;
+  double costOf(int inTokens, int outTokens) =>
+      (inTokens * price.inPerM + outTokens * price.outPerM) / 1000000;
+
+  /// One meal photo: ~1,050 image tokens + ~2k of prompt, ~400 out.
+  double get perPhoto => costOf(3050, 400);
+
+  /// One drafted routine, at the expensive end: a full-body week is ~19k of scoped catalogue plus
+  /// ~1.3k of instructions and schema, and up to ~3k of routines back.
+  ///
+  /// The expensive end on purpose. A muscle-group scope is a quarter of this, and a number that
+  /// turns out to be an overestimate is the one to put in front of somebody deciding whether to
+  /// press the button.
+  double get perPlan => costOf(20200, 3000);
 }
 
 /// The models offered per provider, most capable first so the picker reads as a ladder.
@@ -115,32 +127,69 @@ AiModel? modelFor(String providerId, String? modelId) {
   return table.where((m) => m.id == modelId).firstOrNull ?? table.first;
 }
 
-/// One meal photograph, and everything the prompt needs around it.
+/// One request to a model: what to say, in what shape the answer must come back, and how much
+/// of it there may be.
+///
+/// Deliberately says nothing about *which feature* is asking. It used to be meal-photo-shaped —
+/// `jpeg` + `vocabulary` + `customFoods` — which meant a second feature had either to bend its
+/// prompt into food-shaped fields or to grow a parallel set of adapters. The three providers
+/// disagree about envelopes, not about content, so the content is described once here and each
+/// adapter renders it into its own envelope.
+///
+/// The two-block split of the system half is not house style, it is the caching design: see
+/// [cachePrefix].
 class AiRequest {
   const AiRequest({
-    required this.jpeg,
-    required this.vocabulary,
-    required this.customFoods,
-    this.language = 'en',
-    this.hint,
+    required this.systemPrefix,
+    required this.schema,
+    required this.schemaName,
+    required this.answerTokens,
+    this.systemTail = '',
+    this.userText = '',
+    this.jpeg,
+    this.cachePrefix = false,
   });
 
-  /// The photograph, already downscaled and stripped of metadata. An adapter never resizes and
-  /// never scrubs — by the time bytes reach one, both have happened.
-  final Uint8List jpeg;
+  /// The large, stable half of the system prompt: the instructions and whatever catalogue the
+  /// model has to answer in terms of. Composed by the feature, so the exact bytes — tags and
+  /// all — are that feature's business rather than an adapter's.
+  final String systemPrefix;
 
-  /// The catalogue block. Stable across requests, which is what makes it cacheable.
-  final String vocabulary;
+  /// The volatile half, rendered after [systemPrefix]. Anything that changes per request lives
+  /// here: the answer's language, the user's own entries, what they typed.
+  final String systemTail;
 
-  /// The user's own foods, as a second block. Volatile, so it must sit *after* the cache
-  /// breakpoint rather than inside the prefix.
-  final String customFoods;
+  /// The user turn's text — 'Read this meal.', 'Draft the routine.'
+  final String userText;
 
-  /// The UI language, so names come back in something the user reads.
-  final String language;
+  /// A photograph, already downscaled and stripped of metadata. An adapter never resizes and
+  /// never scrubs — by the time bytes reach one, both have happened. Null for a text-only
+  /// feature, which is most of them.
+  final Uint8List? jpeg;
 
-  /// Anything the user typed to help — "the rice is a big portion".
-  final String? hint;
+  /// The JSON Schema the answer is constrained to. Sent as-is by Anthropic and OpenAI, and
+  /// translated for Gemini — see `geminiSchema`.
+  final Map<String, dynamic> schema;
+
+  /// A name for the schema. OpenAI requires one; nothing else reads it, and the model never
+  /// sees it.
+  final String schemaName;
+
+  /// How many tokens the *answer* may run to. Not the ceiling an adapter sends: the reasoning
+  /// providers add their own headroom on top, because thinking tokens are charged against the
+  /// same limit and a ceiling the reasoning eats first truncates the answer rather than
+  /// shortening it.
+  final int answerTokens;
+
+  /// Whether [systemPrefix] is worth a cache breakpoint (Anthropic only; the others cache
+  /// implicitly or not at all).
+  ///
+  /// **Not a free win, and off by default.** A cache write costs 1.25x input and the ephemeral
+  /// entry lives for minutes. It pays only when the same prefix is sent again inside that
+  /// window — true of meal photos, which people shoot several of in one sitting, and false of
+  /// anything generated once and then not again for weeks, where every call would pay the write
+  /// and no call would ever read it.
+  final bool cachePrefix;
 }
 
 /// Why a read failed. One case per thing the sheet has to say differently.
@@ -211,14 +260,14 @@ class AiFailure extends AiResult {
   final AiFailureKind kind;
 }
 
-abstract interface class AiVisionProvider {
-  /// Whether a photo read can be attempted at all — feature on, provider chosen, key present.
+abstract interface class AiProvider {
+  /// Whether a call can be attempted at all — feature on, provider chosen, key present.
   bool get isAvailable;
 
   /// What to show while it thinks: 'Claude Opus 5'. A proper noun, not translated.
   String get label;
 
-  Future<AiResult> readMeal(AiRequest request);
+  Future<AiResult> run(AiRequest request);
 }
 
 /// What this build ships with until the user sets a key up.
@@ -227,7 +276,7 @@ abstract interface class AiVisionProvider {
 /// whose premise is that nothing leaves the phone. Replacing it is a choice the *user* makes, in
 /// settings, with their own account. That is a stronger version of the sentence
 /// `LocalOnlyAuth` carries, and it is the reason this feature can exist here at all.
-class DisabledAi implements AiVisionProvider {
+class DisabledAi implements AiProvider {
   const DisabledAi();
 
   @override
@@ -237,6 +286,6 @@ class DisabledAi implements AiVisionProvider {
   String get label => '';
 
   @override
-  Future<AiResult> readMeal(AiRequest request) async =>
+  Future<AiResult> run(AiRequest request) async =>
       const AiFailure(AiFailureKind.notConfigured);
 }

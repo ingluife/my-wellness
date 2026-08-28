@@ -1,24 +1,19 @@
 import 'dart:convert';
 
 import '../../domain/ai/ai_provider.dart';
-import '../../domain/ai/meal_photo_prompt.dart';
-import 'vision_adapter.dart';
+import 'ai_adapter.dart';
 
 /// Anthropic's Messages API.
 ///
 /// Raw HTTP because there is no official Anthropic SDK for Dart. Everything about *handling* the
-/// call — timeout, failure mapping, the rules about the key — is in [HttpVisionAdapter]; this file
+/// call — timeout, failure mapping, the rules about the key — is in [HttpAiAdapter]; this file
 /// is only the shape of the request and where the answer sits in the reply.
-class AnthropicAdapter extends HttpVisionAdapter {
+class AnthropicAdapter extends HttpAiAdapter {
   AnthropicAdapter({required super.model, required super.keys, super.client});
 
   /// Pinned, not "latest". The wire format is a contract, and a silent change to it is exactly the
   /// breakage that shows up as "the feature stopped working" with nothing in the logs.
   static const apiVersion = '2023-06-01';
-
-  /// Twelve items at roughly 60 tokens each, with headroom. Small on purpose: the answer is a
-  /// short structured list, and a large ceiling buys nothing but a longer worst case.
-  static const maxTokens = 1500;
 
   @override
   String get providerId => 'anthropic';
@@ -58,7 +53,7 @@ class AnthropicAdapter extends HttpVisionAdapter {
     }
 
     final usage = decoded['usage'];
-    return HttpVisionAdapter.payloadOf(
+    return HttpAiAdapter.payloadOf(
       text,
       cachedTokens: usage is Map ? (usage['cache_read_input_tokens'] as num?)?.toInt() : null,
     );
@@ -70,46 +65,42 @@ class AnthropicAdapter extends HttpVisionAdapter {
 /// The ordering here is the caching design, not house style. `system` renders before `messages`,
 /// and a cache prefix matches byte for byte from the start — so the block that never changes goes
 /// first and carries the breakpoint, and everything that varies per request goes after it. Move
-/// the language line or the user's own foods up into the first block and the prefix stops matching
-/// on every request, which nothing in the app would ever report.
+/// anything volatile up into the first block and the prefix stops matching on every request,
+/// which nothing in the app would ever report.
+///
+/// The breakpoint is only written when the request asks for one — see [AiRequest.cachePrefix] on
+/// why a feature can be better off without it.
 Map<String, dynamic> buildBody(AiRequest request, AiModel model) => {
       'model': model.id,
-      'max_tokens': AnthropicAdapter.maxTokens,
+      'max_tokens': request.answerTokens,
       'system': [
         {
           'type': 'text',
-          'text':
-              '${mealPhotoInstructions.trim()}\n\n<catalogue>\n${request.vocabulary}\n</catalogue>',
-          'cache_control': {'type': 'ephemeral'},
+          'text': request.systemPrefix,
+          if (request.cachePrefix) 'cache_control': {'type': 'ephemeral'},
         },
-        {
-          'type': 'text',
-          'text': buildRequestTail(
-            languageName: request.language,
-            customFoods: request.customFoods,
-            hint: request.hint,
-          ),
-        },
+        if (request.systemTail.isNotEmpty) {'type': 'text', 'text': request.systemTail},
       ],
       'messages': [
         {
           'role': 'user',
           'content': [
-            {
-              'type': 'image',
-              'source': {
-                'type': 'base64',
-                'media_type': 'image/jpeg',
-                'data': base64Encode(request.jpeg),
+            if (request.jpeg != null)
+              {
+                'type': 'image',
+                'source': {
+                  'type': 'base64',
+                  'media_type': 'image/jpeg',
+                  'data': base64Encode(request.jpeg!),
+                },
               },
-            },
-            {'type': 'text', 'text': 'Read this meal.'},
+            {'type': 'text', 'text': request.userText},
           ],
         },
       ],
       'output_config': {
-        'format': {'type': 'json_schema', 'schema': mealPhotoSchema},
-        // Perception with a little arithmetic, not deep reasoning — and the user is watching a
+        'format': {'type': 'json_schema', 'schema': request.schema},
+        // A little arithmetic over a clear input, not deep reasoning — and the user is watching a
         // spinner. Omitted entirely for models that predate the parameter, which reject it.
         if (model.supportsEffort) 'effort': 'medium',
       },

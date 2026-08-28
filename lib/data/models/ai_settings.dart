@@ -17,12 +17,14 @@ import 'json.dart';
 /// A list rather than an enum because these ids are written into the state, and an enum tempts a
 /// future rename that would silently orphan everybody's setting.
 const aiMealPhoto = 'mealPhoto';
+const aiWorkoutPlan = 'workoutPlan';
 
-const aiFeatures = <String>[aiMealPhoto];
+const aiFeatures = <String>[aiMealPhoto, aiWorkoutPlan];
 
 /// English display names; these strings are the i18n keys.
 const aiFeatureName = <String, String>{
   aiMealPhoto: 'Meal photo',
+  aiWorkoutPlan: 'Workout plans',
 };
 
 /// How one feature is set up.

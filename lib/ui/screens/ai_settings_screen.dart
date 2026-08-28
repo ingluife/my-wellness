@@ -38,10 +38,13 @@ class AiSettingsScreen extends ConsumerWidget {
     final configured = ref.watch(aiConfiguredProvider).value ?? const <String>{};
 
     final cfg = s.ai.features[aiMealPhoto] ?? AiFeatureConfig();
+    final planCfg = s.ai.features[aiWorkoutPlan] ?? AiFeatureConfig();
     // Only a provider that actually holds a key can be chosen. Offering the others would build a
     // setting that looks complete and fails on first use.
     final usable = [for (final p in aiProviders) if (configured.contains(p)) p];
     final chosen = cfg.provider != null && usable.contains(cfg.provider) ? cfg.provider : null;
+    final planChosen =
+        planCfg.provider != null && usable.contains(planCfg.provider) ? planCfg.provider : null;
 
     return AppPage(
       children: [
@@ -127,6 +130,41 @@ class AiSettingsScreen extends ConsumerWidget {
                 onChanged: (v) => notifier.update((st) => st.ai.feature(aiMealPhoto).provider = v),
               ),
             if (cfg.isOn) _keepPhotosRow(context, ref, s, cfg),
+          ],
+        ),
+
+        // ---------- workout plans ----------
+        Section(
+          title: t(aiFeatureName[aiWorkoutPlan]!),
+          footer: t('Drafts a routine from your goals, choosing only from the exercises already in the app. You read it before anything is saved, and your training log never leaves the phone.'),
+          children: [
+            AppRow(
+              icon: 'sparkles',
+              iconTint: c.acc,
+              title: t('Draft routines with AI'),
+              subtitle: usable.isEmpty ? t('Add a key above first') : null,
+              trailing: AppSwitch(
+                value: planCfg.isOn,
+                enabled: usable.isNotEmpty,
+                onChanged: (v) => notifier.update((st) {
+                  final f = st.ai.feature(aiWorkoutPlan);
+                  f.on = v;
+                  if (v && f.provider == null && usable.isNotEmpty) f.provider = usable.first;
+                }),
+              ),
+            ),
+            if (usable.isNotEmpty)
+              SelectRow<String>(
+                icon: 'globe',
+                iconTint: c.sys.blue,
+                title: t('Provider'),
+                value: planChosen ?? usable.first,
+                options: [
+                  for (final p in usable) SelectOption(p, aiProviderName[p] ?? p),
+                ],
+                onChanged: (v) =>
+                    notifier.update((st) => st.ai.feature(aiWorkoutPlan).provider = v),
+              ),
           ],
         ),
 
@@ -343,12 +381,23 @@ class _KeyRowState extends ConsumerState<_KeyRow> {
       options: [
         for (final m in table)
           // The cost sits in the subtitle rather than a footnote because this is the moment the
-          // choice is made, and it is the only number on this screen that recurs.
-          SelectOption(m.id, m.label, subtitle: t('about {0} a photo', _money(m.perPhoto))),
+          // choice is made, and it is the only number on this screen that recurs. Both figures,
+          // because one model now serves both features and they are an order of magnitude apart
+          // — a plan carries the exercise catalogue, a photo carries a picture.
+          SelectOption(m.id, m.label,
+              subtitle: t('about {0} a photo · {1} a plan',
+                  _money(m.perPhoto), _money(m.perPlan))),
       ],
-      onChanged: (v) => ref
-          .read(appStateProvider.notifier)
-          .update((st) => st.ai.feature(aiMealPhoto).models[widget.providerId] = v),
+      // Written to every feature, because this row sits under the *provider*, not under one
+      // feature. Storing it on the meal photo alone would leave a plan drafted by whatever
+      // `modelFor` falls back to — the first row of the table, which is the most expensive one.
+      // Somebody who deliberately picked the cheap model would be billed for the dear one with
+      // nothing on screen saying so.
+      onChanged: (v) => ref.read(appStateProvider.notifier).update((st) {
+        for (final f in aiFeatures) {
+          st.ai.feature(f).models[widget.providerId] = v;
+        }
+      }),
     );
   }
 
