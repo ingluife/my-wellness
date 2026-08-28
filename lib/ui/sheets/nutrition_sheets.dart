@@ -494,6 +494,7 @@ Future<void> foodDetailSheet(Food food,
         {String? iso,
         double? slot,
         double? initialGrams,
+        String? actionLabel,
         VoidCallback? onLogged,
         void Function(MealItem)? onPicked}) =>
     showSheet<void>((context, close) => _FoodDetailSheet(
@@ -501,6 +502,7 @@ Future<void> foodDetailSheet(Food food,
         iso: iso,
         slot: slot,
         initialGrams: initialGrams,
+        actionLabel: actionLabel,
         onLogged: onLogged,
         onPicked: onPicked,
         close: close));
@@ -512,6 +514,7 @@ class _FoodDetailSheet extends ConsumerStatefulWidget {
     this.iso,
     this.slot,
     this.initialGrams,
+    this.actionLabel,
     this.onLogged,
     this.onPicked,
   });
@@ -520,6 +523,11 @@ class _FoodDetailSheet extends ConsumerStatefulWidget {
   final String? iso;
   final double? slot;
   final double? initialGrams;
+
+  /// Overrides the button label the [onPicked] branch renders — "Add" reads wrong for the one
+  /// caller reopening this sheet to change a quantity already in a list rather than to add a new
+  /// one to it.
+  final String? actionLabel;
   final VoidCallback? onLogged;
   final void Function(MealItem)? onPicked;
   final void Function([void]) close;
@@ -531,11 +539,45 @@ class _FoodDetailSheet extends ConsumerStatefulWidget {
 class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
   double _grams = 100;
 
+  /// The household measure the count below multiplies, when the user picked one.
+  ///
+  /// Null means free grams: they typed a weight, or came in on one. Grams stay the single source
+  /// of truth either way — this pair only decides which control is on screen and what it does to
+  /// [_grams]. Nothing downstream stores "3 eggs"; `MealItem` holds a weight, so a portion that
+  /// was later corrected in grams cannot disagree with itself.
+  FoodPortion? _portion;
+  double _count = 1;
+
   @override
   void initState() {
     super.initState();
-    if (widget.initialGrams != null) _grams = widget.initialGrams!;
+    final grams = widget.initialGrams;
+    if (grams == null) return;
+    _grams = grams;
+    // Reopening an ingredient that was entered as "3 x medium" should come back showing that,
+    // not a bare 150 g — the weight is all that was stored, so the count is recovered by seeing
+    // which measure divides it evenly. Only ever changes which control is preselected; the grams
+    // are identical whichever branch is taken, so a coincidental match costs nothing.
+    for (final p in widget.food.portions) {
+      if (p.g <= 0) continue;
+      final n = grams / p.g;
+      if ((n - n.roundToDouble()).abs() < 0.01 && n >= 1 && n <= _maxCount) {
+        _portion = p;
+        _count = n.roundToDouble();
+        return;
+      }
+    }
   }
+
+  /// Well past any real serving, and what stops a held-down stepper from running away.
+  static const _maxCount = 50.0;
+
+  /// Picks a household measure, or goes back to typing grams.
+  void _choosePortion(FoodPortion? p, {double count = 1}) => setState(() {
+        _portion = p;
+        _count = count;
+        if (p != null) _grams = p.g * count;
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -568,6 +610,23 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
           Section(
             title: t('Portion'),
             children: [
+              // Three scrambled eggs is one ingredient with a count, not the same food added
+              // three times — so the measure chosen below gets a multiplier of its own rather
+              // than the user doing the arithmetic into the grams field.
+              if (_portion case final p?)
+                AppRow(
+                  title: t('How many'),
+                  subtitle: t(p.n),
+                  trailing: SizedBox(
+                    width: 128,
+                    child: AppStepper(
+                      value: _count,
+                      decimal: false,
+                      onChanged: (v) =>
+                          _choosePortion(p, count: (v ?? 1).clamp(1, _maxCount)),
+                    ),
+                  ),
+                ),
               AppRow(
                 title: t('Grams'),
                 trailing: SizedBox(
@@ -577,7 +636,13 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
                     decimal: false,
                     suffix: t('g'),
                     max: 5000,
-                    onChanged: (v) => setState(() => _grams = v ?? 0),
+                    // Typing a weight is the override, so it drops the measure rather than
+                    // leaving a count on screen that no longer multiplies out to what is shown.
+                    onChanged: (v) => setState(() {
+                      _grams = v ?? 0;
+                      _portion = null;
+                      _count = 1;
+                    }),
                   ),
                 ),
               ),
@@ -586,17 +651,24 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
           ChipRow(children: [
             // The food's own household measures come first, because nobody can picture 180 g
             // of chicken and everybody can picture one breast. Grams stay in the field above
-            // and stay authoritative — this only fills it in.
+            // and stay authoritative — these only fill it in.
+            //
+            // The label is the measure alone, not "1 medium": with a count above it, a chip
+            // that says "1" while the row says 3 contradicts itself.
             for (final portion in f.portions)
-              AppChip('1 ${t(portion.n)}',
-                  selected: _grams == portion.g,
+              AppChip(t(portion.n),
+                  selected: _portion?.n == portion.n,
                   capitalize: false,
-                  onTap: () => setState(() => _grams = portion.g)),
+                  onTap: () => _choosePortion(portion)),
             for (final g in const [100.0, 200.0])
               AppChip('${g.round()} g',
-                  selected: _grams == g,
+                  selected: _portion == null && _grams == g,
                   capitalize: false,
-                  onTap: () => setState(() => _grams = g)),
+                  onTap: () => setState(() {
+                        _portion = null;
+                        _count = 1;
+                        _grams = g;
+                      })),
           ]),
           const SizedBox(height: 12),
           AppCard(
@@ -649,7 +721,7 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
             const SizedBox(height: 6),
           ],
           if (widget.onPicked case final picked?)
-            AppButton(t('Add'), variant: BtnVariant.primary, onTap: () {
+            AppButton(widget.actionLabel ?? t('Add'), variant: BtnVariant.primary, onTap: () {
               if (_grams <= 0) {
                 ref.read(uiProvider).toast(t('Enter a portion first'));
                 return;
@@ -840,6 +912,18 @@ class _RecipeSheetState extends ConsumerState<_RecipeSheet> {
     ref.read(uiProvider).toast(t('Saved {0}', name));
   }
 
+  /// Reopens the same detail sheet an ingredient was added through, seeded with the grams it
+  /// already carries, and replaces that entry rather than appending a new one.
+  void _editIngredient(int index) {
+    final item = _items[index];
+    foodDetailSheet(
+      foods.or(item.fid ?? ''),
+      initialGrams: item.g,
+      actionLabel: t('Save'),
+      onPicked: (edited) => setState(() => _items[index] = edited),
+    );
+  }
+
   void _delete() {
     final id = widget.existing?.id;
     if (id == null) return;
@@ -911,16 +995,28 @@ class _RecipeSheetState extends ConsumerState<_RecipeSheet> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 5),
                       child: Row(children: [
-                        FoodThumb(food: foods.or(_items[i].fid ?? ''), size: 28),
-                        const SizedBox(width: 8),
+                        // Tapping the row is how a quantity already on the list changes — reusing
+                        // the same detail sheet the ingredient was added through, seeded with what
+                        // is already there, rather than the only way out being to delete this row
+                        // and search for the same food again to add it back at a new weight.
                         Expanded(
-                          child: Text(mealItemLabel(_items[i]),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: ts(TypeScale.cap, color: c.label2)),
+                          child: Pressable(
+                            scale: .98,
+                            onTap: () => _editIngredient(i),
+                            child: Row(children: [
+                              FoodThumb(food: foods.or(_items[i].fid ?? ''), size: 28),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(mealItemLabel(_items[i]),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: ts(TypeScale.cap, color: c.label2)),
+                              ),
+                              Text('${_items[i].kcal.round()}',
+                                  style: ts(TypeScale.cap, color: c.label3)),
+                            ]),
+                          ),
                         ),
-                        Text('${_items[i].kcal.round()}',
-                            style: ts(TypeScale.cap, color: c.label3)),
                         const SizedBox(width: 8),
                         Pressable(
                           scale: .9,
@@ -989,7 +1085,10 @@ class _RecipeSheetState extends ConsumerState<_RecipeSheet> {
 /// Most days are a variation on a day you have already had, and re-entering one food at a time
 /// is the friction that ends food logs.
 Future<void> copyDaySheet(WidgetRef ref, {required String to}) =>
-    showSheet<void>((context, close) => _CopyDaySheet(to: to, close: close));
+    // Same shape as the food picker, same reason: a list of every day ever logged, which is a
+    // list with no ceiling on it.
+    showSheet<void>(
+        scrollable: false, (context, close) => _CopyDaySheet(to: to, close: close));
 
 class _CopyDaySheet extends ConsumerWidget {
   const _CopyDaySheet({required this.to, required this.close});
@@ -1141,7 +1240,15 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                 onTap: () => setState(() => _cat = _cat == cat ? null : cat)),
         ]),
         const SizedBox(height: 10),
-        Flexible(
+        // A hard cap, not `Flexible`. `Flexible` only means something under an ancestor with a
+        // bounded height to divide up, and the sheet shell scrolls its content under an
+        // unbounded `SingleChildScrollView` — the shape that let this list grow to all 240-odd
+        // foods and push everything below it, buttons included, off the bottom of the screen.
+        // Capping it here means the list is compact for a short result and scrolls on its own
+        // once it outgrows the cap; the sheet as a whole still scrolls too, for whatever the cap
+        // plus the rest of this content adds up to on a short phone.
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .4),
           child: ListView(
             shrinkWrap: true,
             children: [
@@ -1193,21 +1300,22 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
         Row(children: [
           // Calories with no food behind them belong to a day, not to a recipe: an ingredient
           // list whose entries cannot be re-costed is not one the planner can scale.
+          //
+          // Icon tiles rather than full-width buttons: these two are the fallbacks for when the
+          // search above has come up empty, not the primary way in, and a pair of tall bold-text
+          // buttons was heavier than that role earns. The caption underneath is what the tab bar
+          // already does to pair an icon with a word without the icon losing to it.
           if (widget.iso case final iso? when widget.onPicked == null) ...[
-            Expanded(
-              child: AppButton(t('Quick add'), icon: 'bolt', onTap: () {
-                widget.close();
-                quickAddSheet(ref, iso: iso, slot: widget.slot);
-              }),
-            ),
+            _QuickAction(icon: 'bolt', label: t('Quick add'), onTap: () {
+              widget.close();
+              quickAddSheet(ref, iso: iso, slot: widget.slot);
+            }),
             const SizedBox(width: 8),
           ],
-          Expanded(
-            child: AppButton(t('Your own food'), icon: 'plus', onTap: () {
-              widget.close();
-              customFoodSheet(iso: widget.iso, slot: widget.slot);
-            }),
-          ),
+          _QuickAction(icon: 'plus', label: t('Your own food'), onTap: () {
+            widget.close();
+            customFoodSheet(iso: widget.iso, slot: widget.slot);
+          }),
         ]),
         const SizedBox(height: 8),
       ],
@@ -1235,6 +1343,49 @@ class _FoodRow extends StatelessWidget {
           subtitle: '${food.kcal.round()} ${t('kcal')} · '
               '${fmtNum(food.p)}P ${fmtNum(food.c)}C ${fmtNum(food.f)}F · '
               '${t('per 100 g')}',
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact icon-and-caption tile, for the two fallbacks under the food search.
+///
+/// The same pairing the tab bar uses — an icon carries the recognition, the small caption
+/// underneath is what keeps "bolt" and "plus" from being two visually identical grey glyphs.
+/// Sized to the plain [AppButton] fill so the row still reads as part of the same control family,
+/// just a quieter one.
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({required this.icon, required this.label, required this.onTap});
+
+  final String icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Expanded(
+      child: Pressable.builder(
+        onTap: onTap,
+        build: (context, pressed) => AnimatedContainer(
+          duration: Motion.fast,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: pressed ? c.surface3 : c.surface2,
+            borderRadius: BorderRadius.circular(R.md),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcon(icon, size: 19, color: c.label),
+              const SizedBox(height: 4),
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ts(TypeScale.cap, size: 11, color: c.label2, weight: FontWeight.w500)),
+            ],
+          ),
         ),
       ),
     );

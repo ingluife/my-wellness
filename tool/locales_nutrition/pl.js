@@ -71,6 +71,7 @@ export default {
   "Grams": "Gramy",
   "Height": "Wzrost",
   "Held at the floor": "Utrzymane na minimum",
+  "How many": "Ile",
   "How old are you?": "Ile masz lat?",
   "How tall are you?": "Ile masz wzrostu?",
   "How this was worked out": "Jak to zostało wyliczone",

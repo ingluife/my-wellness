@@ -78,11 +78,22 @@ const aiModels = <String, List<AiModel>>{
     AiModel('claude-haiku-4-5', 'Claude Haiku 4.5', (inPerM: 1, outPerM: 5),
         supportsEffort: false),
   ],
+  // Google's list is **Free-tier only**, and that is the whole rule for adding to it. Its pricing
+  // page marks the Pro models as *Free Tier: Not available* — a key with no billing account gets
+  // zero quota for them, not a small one, and Google reports that as an ordinary 429. First place
+  // here is also the default a user gets if they never open the Model picker, so a Pro model at
+  // the top meant every free-tier key was silently pointed at the one model it could not use and
+  // told "too many requests" for a limit it never approached. Check the Free Tier column before
+  // adding anything, and do not reorder this by capability.
   'google': [
-    AiModel('gemini-3.1-pro-preview', 'Gemini 3.1 Pro', (inPerM: 2, outPerM: 12)),
-    // Promotional pricing through 2026-12-31; doubles to 1.50/7.50 on 2027-01-01. The screen
-    // says prices are the provider's and move, which is the honest way to carry that.
+    // The default, and chosen for being boring: same price as 3.7, free tier, and long enough in
+    // service to be the one to reach for when something else is already suspect.
+    AiModel('gemini-3.6-flash', 'Gemini 3.6 Flash', (inPerM: 0.75, outPerM: 3.75)),
+    // Promotional pricing through 2026-12-31; both Flash models rise to 1.50/7.50 on 2027-01-01.
+    // The screen says prices are the provider's and move, which is the honest way to carry that.
     AiModel('gemini-3.7-flash', 'Gemini 3.7 Flash', (inPerM: 0.75, outPerM: 3.75)),
+    AiModel('gemini-3.5-flash-lite', 'Gemini 3.5 Flash Lite', (inPerM: 0.30, outPerM: 2.50)),
+    AiModel('gemini-3.1-flash-lite', 'Gemini 3.1 Flash-Lite', (inPerM: 0.25, outPerM: 1.50)),
   ],
   'openai': [
     AiModel('gpt-5.6-sol', 'GPT-5.6 Sol', (inPerM: 4, outPerM: 20)),

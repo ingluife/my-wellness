@@ -39,7 +39,7 @@ void main() {
   test('the nutrition strings are present in every language', () {
     final groups = jsonDecode(File('tool/nutrition_keys.json').readAsStringSync()) as Map;
     final expected = [for (final g in groups.values) ...(g as List).cast<String>()];
-    expect(expected, hasLength(740));
+    expect(expected, hasLength(741));
     for (final e in packs.entries) {
       final missing = expected.where((k) => !e.value.containsKey(k)).toList();
       expect(missing, isEmpty, reason: '${e.key} is missing ${missing.length} nutrition strings');

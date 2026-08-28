@@ -71,6 +71,7 @@ export default {
   "Grams": "克",
   "Height": "身高",
   "Held at the floor": "已保持在下限",
+  "How many": "数量",
   "How old are you?": "你多大年纪？",
   "How tall are you?": "你有多高？",
   "How this was worked out": "这是怎么算出来的",

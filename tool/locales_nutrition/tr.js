@@ -71,6 +71,7 @@ export default {
   "Grams": "Gram",
   "Height": "Boy",
   "Held at the floor": "Alt sınırda tutuldu",
+  "How many": "Kaç adet",
   "How old are you?": "Kaç yaşındasın?",
   "How tall are you?": "Boyun kaç?",
   "How this was worked out": "Bu nasıl hesaplandı",

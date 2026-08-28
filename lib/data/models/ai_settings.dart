@@ -32,7 +32,8 @@ const aiFeatureName = <String, String>{
 /// that chose the value that happens to be the default, or the key can never be dropped again and
 /// the state stops matching a fresh openGym export.
 class AiFeatureConfig {
-  AiFeatureConfig({this.on, this.provider, this.model, this.keepPhotos});
+  AiFeatureConfig({this.on, this.provider, Map<String, String>? models, this.keepPhotos})
+      : models = models ?? {};
 
   /// null = never chosen, read as off.
   ///
@@ -41,15 +42,37 @@ class AiFeatureConfig {
   /// it did before the feature existed.
   bool? on;
 
-  /// 'anthropic' | 'google' | 'openai'. null = never chosen.
+  /// 'anthropic' | 'google' | 'openai' — which configured provider actually runs the feature.
+  /// null = never chosen.
   String? provider;
 
-  /// The model id, as the provider spells it. null = this build's default for [provider].
+  /// Provider id -> the model id chosen for it, as that provider spells it.
+  ///
+  /// Per provider rather than one flat field: a model is set up in the same place its provider's
+  /// key is, on its own row, whether or not that provider happens to be the one [provider] points
+  /// at right now — swapping which provider runs the feature and back must not forget what was
+  /// chosen for the one you swapped away from, the way a single shared field already did once.
+  /// A provider absent from this map reads as this build's default for it — see [modelFor].
   ///
   /// Stored rather than derived because model ids are the one thing here with a price attached:
   /// a user who deliberately picked the cheap model must not silently get moved to the expensive
   /// one by an app update.
-  String? model;
+  Map<String, String> models;
+
+  /// The model chosen for [provider] — sugar over [models] for the common case of "whichever
+  /// provider is currently running the feature". Setting it with no provider chosen yet has
+  /// nowhere to file the choice and is a no-op, the same way choosing a model made no sense
+  /// before a provider did.
+  String? get model => provider == null ? null : models[provider];
+  set model(String? v) {
+    final p = provider;
+    if (p == null) return;
+    if (v == null) {
+      models.remove(p);
+    } else {
+      models[p] = v;
+    }
+  }
 
   /// Whether the photograph is kept on the phone after the meal is logged. Read only by the meal
   /// photo feature; a future feature with no photograph simply never writes it.
@@ -62,7 +85,7 @@ class AiFeatureConfig {
   bool? keepPhotos;
 
   bool get isDefault =>
-      on == null && provider == null && model == null && keepPhotos == null;
+      on == null && provider == null && models.isEmpty && keepPhotos == null;
 
   /// Whether this feature should actually run. Absent is off; that is the point.
   bool get isOn => on == true;
@@ -70,18 +93,32 @@ class AiFeatureConfig {
   /// Absent is yes — see [keepPhotos].
   bool get keepsPhotos => keepPhotos != false;
 
-  factory AiFeatureConfig.fromJson(Map<String, dynamic> j) => AiFeatureConfig(
-        on: j['on'] is bool ? j['on'] as bool : null,
-        provider: asStr(j['provider']),
-        model: asStr(j['model']),
-        keepPhotos: j['keepPhotos'] is bool ? j['keepPhotos'] as bool : null,
-      );
+  factory AiFeatureConfig.fromJson(Map<String, dynamic> j) {
+    final provider = asStr(j['provider']);
+    final models = <String, String>{
+      for (final e in asMap(j['models']).entries)
+        if (e.value is String) e.key: e.value as String,
+    };
+    // Back-compat with a build that had one flat `model` tied to whichever provider was active:
+    // seed it under that provider so an upgrade does not silently revert an already-made choice
+    // back to this build's default model.
+    if (provider != null && !models.containsKey(provider)) {
+      final legacy = asStr(j['model']);
+      if (legacy != null) models[provider] = legacy;
+    }
+    return AiFeatureConfig(
+      on: j['on'] is bool ? j['on'] as bool : null,
+      provider: provider,
+      models: models,
+      keepPhotos: j['keepPhotos'] is bool ? j['keepPhotos'] as bool : null,
+    );
+  }
 
   Map<String, dynamic> toJson() {
     final m = <String, dynamic>{};
     put(m, 'on', on);
     put(m, 'provider', provider);
-    put(m, 'model', model);
+    if (models.isNotEmpty) m['models'] = models;
     put(m, 'keepPhotos', keepPhotos);
     return m;
   }

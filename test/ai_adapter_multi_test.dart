@@ -8,18 +8,24 @@ import 'package:my_open_gym/data/ai/gemini_adapter.dart';
 import 'package:my_open_gym/data/ai/openai_adapter.dart';
 import 'package:my_open_gym/data/ai/vision_adapter.dart';
 import 'package:my_open_gym/domain/ai/ai_provider.dart';
+import 'package:my_open_gym/domain/ai/meal_photo_prompt.dart';
 
 /// The Gemini and OpenAI adapters.
 ///
-/// Both providers changed shape substantially during 2026 — Google moved from `generateContent`
-/// with `contents`/`parts`/`inline_data` to `/v1beta/interactions` with a flat `input`, and OpenAI
-/// from `/v1/chat/completions` to `/v1/responses` with `input_text`/`input_image` and
-/// `text.format`. Code written from memory of either older API is wrong in several places at once
-/// and fails only against the live service.
+/// OpenAI changed shape substantially during 2026 — `/v1/chat/completions` to `/v1/responses`
+/// with `input_text`/`input_image` and `text.format` — and code written from memory of the older
+/// API is wrong in several places at once, failing only against the live service. So these tests
+/// do something the Anthropic ones do not need to: they pin the *specific* fields that differ
+/// from the superseded API, and assert the old spellings are absent.
 ///
-/// So these tests do something the Anthropic ones do not need to: they pin the *specific* fields
-/// that differ from the superseded APIs, and assert the old spellings are absent. That turns a
-/// silent 400 in a user's kitchen into a red test here.
+/// Google's half is pinned for the opposite reason. The adapter briefly targeted
+/// `/v1beta/interactions`, Google's newer unified endpoint, and had to be moved back to
+/// `generateContent` on evidence: a key working elsewhere got a flat 429 from `interactions` on
+/// every request with the account nowhere near its quota, and a raw POST to that endpoint
+/// uploaded its body and then returned zero bytes until it timed out. So the assertions here
+/// hold the `generateContent` spellings — `contents`/`parts`/`inline_data`, `system_instruction`
+/// as an object, `generationConfig.responseSchema` — and it is `interactions`' flat `input`
+/// whose absence is now the thing worth checking. See gemini_adapter.dart's own note.
 void main() {
   const gemini = AiModel('gemini-3.7-flash', 'Gemini 3.7 Flash', (inPerM: 0.75, outPerM: 3.75));
   const openai = AiModel('gpt-5.6-terra', 'GPT-5.6 Terra', (inPerM: 2, outPerM: 12));
@@ -43,7 +49,12 @@ void main() {
   };
 
   group('Gemini request body', () {
-    test('posts to the interactions endpoint with the Google key header', () async {
+    /// The parts of the single user turn.
+    List<Object?> partsOf(Map<String, dynamic> b) =>
+        ((b['contents'] as List).single as Map)['parts'] as List;
+
+    test('posts to generateContent, with the model in the path and the key in its header',
+        () async {
       late http.Request seen;
       final a = GeminiAdapter(
         model: gemini,
@@ -55,50 +66,94 @@ void main() {
       );
 
       await a.readMeal(req());
-      expect(seen.url.toString(),
-          'https://generativelanguage.googleapis.com/v1beta/interactions');
+      // The model id is in the URL here, not the body — the one structural difference from the
+      // other two adapters, and easy to lose in a refactor that treats endpoints as constants.
+      expect(
+        seen.url.toString(),
+        'https://generativelanguage.googleapis.com/v1beta/models/'
+        'gemini-3.7-flash:generateContent',
+      );
       // Google takes the key in its own header, not an Authorization bearer.
       expect(seen.headers['x-goog-api-key'], secret);
       expect(seen.headers.containsKey('Authorization'), isFalse);
+      // Never the endpoint that answered every request with a 429 and then with nothing at all.
+      expect(seen.url.path, isNot(contains('interactions')));
     });
 
-    test('sends a flat image part, not the superseded inline_data nesting', () {
+    test('nests the image as inline_data with a mime type', () {
       final b = buildGeminiBody(req(), gemini);
-      final input = b['input'] as List;
-      final image = input.firstWhere((p) => (p as Map)['type'] == 'image') as Map;
+      final image = partsOf(b).firstWhere((p) => (p as Map).containsKey('inline_data')) as Map;
+      final data = image['inline_data'] as Map;
 
-      expect(image['mime_type'], 'image/jpeg');
-      expect(base64Decode(image['data'] as String), jpeg);
+      expect(data['mime_type'], 'image/jpeg');
+      expect(base64Decode(data['data'] as String), jpeg);
 
-      // The old generateContent spelling. Its absence is the point of the test.
-      final rendered = jsonEncode(b);
-      expect(rendered, isNot(contains('inline_data')));
-      expect(rendered, isNot(contains('inlineData')));
-      expect(b.containsKey('contents'), isFalse);
+      // Not the interactions shape: flat typed parts in a top-level `input`.
+      expect(b.containsKey('input'), isFalse);
+      expect(jsonEncode(b), isNot(contains('"type":"image"')));
     });
 
-    test('constrains the answer with response_format, not responseSchema', () {
+    test('constrains the answer with responseSchema inside generationConfig', () {
       final b = buildGeminiBody(req(), gemini);
-      final fmt = b['response_format'] as Map;
-      expect(fmt['mime_type'], 'application/json');
-      expect(fmt['schema'], isA<Map>());
+      final cfg = b['generationConfig'] as Map;
 
-      final rendered = jsonEncode(b);
-      expect(rendered, isNot(contains('responseSchema')));
-      expect(rendered, isNot(contains('responseMimeType')));
+      expect(cfg['responseMimeType'], 'application/json');
+      expect(cfg['responseSchema'], isA<Map>());
+      // response_format is the interactions spelling and is not a field here.
+      expect(b.containsKey('response_format'), isFalse);
+    });
+
+    test('the schema is sent in Google dialect, not as JSON Schema', () {
+      // `responseSchema` is the OpenAPI-derived Schema message, whose type names are upper case.
+      // Sending the lower-case JSON Schema spelling the other two providers take is a 400 from
+      // every model at once — which surfaces as "the model may no longer exist" and sends the
+      // next reader hunting through the model table for a fault that is in the schema.
+      final rendered = jsonEncode(buildGeminiBody(req(), gemini)['generationConfig']);
+
+      expect(rendered, isNot(contains('"type":"object"')));
+      expect(rendered, isNot(contains('"type":"string"')));
+      expect(rendered, isNot(contains('"type":"array"')));
+      expect(rendered, contains('"type":"OBJECT"'));
+      expect(rendered, contains('"type":"ARRAY"'));
+
+      // A keyword the Schema message has no field for; an unknown field is the other 400.
+      expect(rendered, isNot(contains('additionalProperties')));
+
+      // ...and the shared schema itself is untouched, because Anthropic and OpenAI send it as it
+      // stands. A conversion that mutated the original would break them both silently.
+      expect(mealPhotoSchema['type'], 'object');
+      expect(mealPhotoSchema['additionalProperties'], isFalse);
+    });
+
+    test('the conversion reaches every level and leaves enum values alone', () {
+      final converted = geminiSchema(mealPhotoSchema) as Map;
+      final props = converted['properties'] as Map;
+
+      // Nested: items -> items -> properties -> per100.
+      final item = (props['items'] as Map)['items'] as Map;
+      expect(item['type'], 'OBJECT');
+      final per100 = (item['properties'] as Map)['per100'] as Map;
+      expect(per100['type'], 'OBJECT');
+      expect((per100['properties'] as Map)['kcal']['type'], 'NUMBER');
+
+      // `enum` carries data, not types. Upper-casing 'high' would change what the model may say.
+      expect((props['confidence'] as Map)['enum'], ['high', 'medium', 'low']);
     });
 
     test('the catalogue goes in system_instruction and the volatile parts do not', () {
       final b = buildGeminiBody(req(hint: 'big portion'), gemini);
-      final system = b['system_instruction'] as String;
+      // An object with parts, not a bare string: the REST shape differs from the SDKs', which
+      // take a string and wrap it for you.
+      final system =
+          ((b['system_instruction'] as Map)['parts'] as List).single as Map;
+      final prefix = system['text'] as String;
 
-      expect(system, contains('f0001 Chicken breast'));
-      expect(system, isNot(contains('Spanish')));
-      expect(system, isNot(contains('My shake')));
-      expect(system, isNot(contains('big portion')));
+      expect(prefix, contains('f0001 Chicken breast'));
+      expect(prefix, isNot(contains('Spanish')));
+      expect(prefix, isNot(contains('My shake')));
+      expect(prefix, isNot(contains('big portion')));
 
-      final text = (b['input'] as List)
-          .firstWhere((p) => (p as Map)['type'] == 'text') as Map;
+      final text = partsOf(b).firstWhere((p) => (p as Map).containsKey('text')) as Map;
       expect(text['text'], contains('Spanish'));
       expect(text['text'], contains('big portion'));
     });
@@ -106,8 +161,8 @@ void main() {
     test('the output ceiling leaves room for thinking tokens', () {
       // Gemini 3.7 Flash thinks, and thinking counts against this. A ceiling sized only for the
       // JSON gets eaten before the answer starts and truncates it.
-      final cfg = buildGeminiBody(req(), gemini)['generation_config'] as Map;
-      expect(cfg['max_output_tokens'], greaterThanOrEqualTo(4000));
+      final cfg = buildGeminiBody(req(), gemini)['generationConfig'] as Map;
+      expect(cfg['maxOutputTokens'], greaterThanOrEqualTo(4000));
     });
   });
 
@@ -121,29 +176,55 @@ void main() {
       return a.readMeal(req());
     }
 
-    test('finds the text inside the model_output step', () async {
+    test('finds the text in the first candidate', () async {
       final r = await respond(_geminiBody(goodAnswer));
       expect(r, isA<AiDraft>());
       expect(((r as AiDraft).raw as Map)['items'], hasLength(1));
     });
 
-    test('steps before the model_output one are skipped, not indexed past', () async {
+    test('a thinking part ahead of the answer is skipped, not indexed past', () async {
       final withThought = jsonEncode({
-        'steps': [
-          {'type': 'thought', 'content': <Object>[]},
+        'candidates': [
           {
-            'type': 'model_output',
-            'content': [
-              {'type': 'text', 'text': jsonEncode(goodAnswer)}
-            ],
+            'content': {
+              'parts': [
+                {'thought': true, 'text': 'weighing the rice'},
+                {'text': jsonEncode(goodAnswer)},
+              ],
+            },
           },
         ],
       });
       expect(await respond(withThought), isA<AiDraft>());
     });
 
+    test('a blocked prompt is a refusal, not an unreadable answer', () async {
+      // It arrives as an ordinary 200 with no candidates at all, so promptFeedback has to be
+      // read before reaching for them. Telling the user the answer was unreadable would send
+      // them round a retry loop over something retrying cannot fix.
+      final blocked = jsonEncode({
+        'promptFeedback': {'blockReason': 'SAFETY'},
+      });
+      expect(((await respond(blocked)) as AiFailure).kind, AiFailureKind.refused);
+
+      final stopped = jsonEncode({
+        'candidates': [
+          {'finishReason': 'SAFETY', 'content': <String, Object>{}},
+        ],
+      });
+      expect(((await respond(stopped)) as AiFailure).kind, AiFailureKind.refused);
+    });
+
     test('a shape it does not recognise never throws', () async {
-      for (final junk in ['not json', '{}', '{"steps":"nope"}', '{"steps":[]}']) {
+      for (final junk in [
+        'not json',
+        '{}',
+        '{"candidates":"nope"}',
+        '{"candidates":[]}',
+        '{"candidates":[{"content":{"parts":[]}}]}',
+        // Every part is reasoning and none is the answer.
+        '{"candidates":[{"content":{"parts":[{"thought":true,"text":"hm"}]}}]}',
+      ]) {
         final r = await respond(junk);
         expect((r as AiFailure).kind, AiFailureKind.unreadable, reason: junk);
       }
@@ -331,6 +412,30 @@ void main() {
     }
   });
 
+  test('no Google model is one a free-tier key cannot use', () {
+    // The bug this pins: Google's table led with gemini-3.1-pro-preview, which its own pricing
+    // page marks "Free Tier: Not available" — an API key with no billing account gets zero quota
+    // for it and Google reports that as a plain 429. First in the table is also what a user gets
+    // if they never open the Model picker, so every free-tier key was silently pointed at the one
+    // model it could not use and told "too many requests" for a limit it never approached.
+    //
+    // It was dropped rather than demoted, so this checks the whole table and not just its head:
+    // a Pro model anywhere in the picker is one a free-tier user can select and be refused by,
+    // with no way to tell that apart from a real rate limit. Anthropic and OpenAI are not checked
+    // because neither gates a model behind a billing tier this way.
+    //
+    // Matched on the id prefix rather than an exact list, because the trap is a *family*: the
+    // next Pro id will not be spelled like this one, and an exact list would silently pass it.
+    for (final m in aiModels['google']!) {
+      expect(m.id, isNot(contains('-pro')),
+          reason: '${m.id} is Pro — check the Free Tier column on the pricing page');
+    }
+
+    // ...and the default really is the first entry, which is what makes ordering load-bearing.
+    expect(defaultModelFor('google')!.id, aiModels['google']!.first.id);
+    expect(modelFor('google', null)!.id, aiModels['google']!.first.id);
+  });
+
   test('every provider the settings screen offers has an adapter behind it', () {
     // The settings screen lists aiProviders. A provider with no model table is a row the user can
     // pick and then find broken.
@@ -342,12 +447,15 @@ void main() {
 }
 
 String _geminiBody(Object payload) => jsonEncode({
-      'steps': [
+      'candidates': [
         {
-          'type': 'model_output',
-          'content': [
-            {'type': 'text', 'text': jsonEncode(payload)}
-          ],
+          'finishReason': 'STOP',
+          'content': {
+            'role': 'model',
+            'parts': [
+              {'text': jsonEncode(payload)}
+            ],
+          },
         },
       ],
     });

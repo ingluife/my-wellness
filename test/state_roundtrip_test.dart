@@ -276,7 +276,10 @@ void main() {
 
     test('the deep clone reaches into ai settings', () {
       final s = AppState.defaults();
-      s.ai.feature(aiMealPhoto).model = 'claude-opus-5';
+      // `model` needs a provider to file itself under now — see AiFeatureConfig.models.
+      s.ai.feature(aiMealPhoto)
+        ..provider = 'anthropic'
+        ..model = 'claude-opus-5';
       final clone = s.copy();
       clone.ai.feature(aiMealPhoto).model = 'something-else';
       expect(s.ai.feature(aiMealPhoto).model, 'claude-opus-5');

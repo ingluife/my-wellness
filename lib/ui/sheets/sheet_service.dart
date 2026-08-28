@@ -27,6 +27,10 @@ BuildContext get _ctx => appNavigatorKey.currentContext!;
 /// drift, because a stale entry answers no.
 final _sheetRoutes = <Route<dynamic>>{};
 
+/// The sheet's own gutter. Applied by the shell either way, so a sheet that scrolls its own list
+/// is inset exactly like every other one.
+const _contentPad = EdgeInsets.fromLTRB(18, 0, 18, 20);
+
 bool get _anySheetOpen => _sheetRoutes.any((r) => r.isActive);
 
 /// A bottom sheet.
@@ -35,9 +39,14 @@ bool get _anySheetOpen => _sheetRoutes.any((r) => r.isActive);
 /// itself, which keeps every flow reading the way the original's `openSheet(close => …)` does.
 /// [locked] pins the sheet open — the weigh-in before a workout and the finish summary both
 /// use it, because dismissing them would skip a step rather than cancel one.
+///
+/// [scrollable] is what almost every sheet wants: a column of content that the shell scrolls as
+/// one. Pass false for a sheet that scrolls a list of its own and keeps something below it — see
+/// [_SheetShell], where the difference is spelled out.
 Future<T?> showSheet<T>(
   Widget Function(BuildContext context, void Function([T? result]) close) builder, {
   bool locked = false,
+  bool scrollable = true,
   BuildContext? context,
 }) {
   final ctx = context ?? _ctx;
@@ -61,6 +70,7 @@ Future<T?> showSheet<T>(
       return _SheetShell(
         locked: locked,
         nested: nested,
+        scrollable: scrollable,
         onDismiss: () => Navigator.of(sheetCtx).pop(),
         child: Builder(
           builder: (inner) => builder(inner, ([result]) => Navigator.of(sheetCtx).pop(result)),
@@ -75,6 +85,7 @@ class _SheetShell extends StatelessWidget {
     required this.child,
     required this.locked,
     required this.nested,
+    required this.scrollable,
     required this.onDismiss,
   });
 
@@ -83,6 +94,22 @@ class _SheetShell extends StatelessWidget {
 
   /// Opened from another sheet, so leaving goes back rather than out.
   final bool nested;
+
+  /// Whether the shell scrolls the sheet's content, or hands it a bounded box and gets out of
+  /// the way.
+  ///
+  /// This is a load-bearing distinction rather than a preference, and getting it wrong is
+  /// invisible until the sheet is long. Scrolling here means the child is laid out under an
+  /// **unbounded** height, so a `Flexible` inside it has no share of anything to take and a
+  /// `shrinkWrap` list expands to its full content — pushing whatever the sheet put below it,
+  /// buttons included, past the bottom of the screen where nothing can reach it. Worse, the
+  /// nested list wins the drag gesture while having nothing to scroll, so the shell's own scroll
+  /// view never moves and the sheet reads as frozen.
+  ///
+  /// False gives the child the height it actually has. A sheet that scrolls a list of its own
+  /// and keeps a footer under it — the food picker, the day copier — needs that; everything
+  /// else is a column of content and wants the default.
+  final bool scrollable;
 
   final VoidCallback onDismiss;
 
@@ -147,10 +174,9 @@ class _SheetShell extends StatelessWidget {
                 ),
               ),
               Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
-                  child: child,
-                ),
+                child: scrollable
+                    ? SingleChildScrollView(padding: _contentPad, child: child)
+                    : Padding(padding: _contentPad, child: child),
               ),
             ],
           ),

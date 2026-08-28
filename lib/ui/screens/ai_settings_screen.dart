@@ -74,7 +74,7 @@ class AiSettingsScreen extends ConsumerWidget {
           ].join(' '),
           children: [
             for (final id in aiProviders)
-              _KeyRow(providerId: id, isSet: configured.contains(id)),
+              _KeyRow(providerId: id, isSet: configured.contains(id), cfg: cfg),
           ],
         ),
 
@@ -98,11 +98,18 @@ class AiSettingsScreen extends ConsumerWidget {
               trailing: AppSwitch(
                 value: cfg.isOn,
                 enabled: usable.isNotEmpty,
-                onChanged: (v) => notifier.update(
+                onChanged: (v) => notifier.update((st) {
+                  final f = st.ai.feature(aiMealPhoto);
                   // false rather than null when switched off: an explicit "no" has to stay
                   // distinguishable from never having chosen, the same way `effort` does.
-                  (st) => st.ai.feature(aiMealPhoto).on = v,
-                ),
+                  f.on = v;
+                  // Turning on with no provider chosen yet defaults to the one usable provider —
+                  // otherwise the Provider row below displays it as already selected (see its own
+                  // comment) while `f.provider` stays null, and the feature never actually turns
+                  // on: `aiMealPhotoProvider` gates on a real provider id, not on what the row
+                  // happens to be showing.
+                  if (v && f.provider == null && usable.isNotEmpty) f.provider = usable.first;
+                }),
               ),
             ),
             if (usable.isNotEmpty)
@@ -114,16 +121,11 @@ class AiSettingsScreen extends ConsumerWidget {
                 options: [
                   for (final p in usable) SelectOption(p, aiProviderName[p] ?? p),
                 ],
-                onChanged: (v) => notifier.update((st) {
-                  final f = st.ai.feature(aiMealPhoto);
-                  // Changing provider drops a model id that belonged to the old one — model ids
-                  // are provider-specific and a stale one would be sent to a service that has
-                  // never heard of it.
-                  if (f.provider != v) f.model = null;
-                  f.provider = v;
-                }),
+                // Only which provider runs the feature — the model for each one lives on that
+                // provider's own row below now, so switching back and forth here no longer means
+                // re-picking it every time.
+                onChanged: (v) => notifier.update((st) => st.ai.feature(aiMealPhoto).provider = v),
               ),
-            if (chosen != null) ..._modelRow(context, ref, chosen, cfg),
             if (cfg.isOn) _keepPhotosRow(context, ref, s, cfg),
           ],
         ),
@@ -169,38 +171,20 @@ class AiSettingsScreen extends ConsumerWidget {
       ),
     );
   }
-
-  List<Widget> _modelRow(
-      BuildContext context, WidgetRef ref, String providerId, AiFeatureConfig cfg) {
-    final table = aiModels[providerId];
-    if (table == null || table.isEmpty) return const [];
-    final current = modelFor(providerId, cfg.model)!;
-    return [
-      SelectRow<String>(
-        icon: 'sparkles',
-        iconTint: context.c.sys.purple,
-        title: t('Model'),
-        value: current.id,
-        options: [
-          for (final m in table)
-            // The cost sits in the subtitle rather than a footnote because this is the moment the
-            // choice is made, and it is the only number on this screen that recurs.
-            SelectOption(m.id, m.label, subtitle: t('about {0} a photo', _money(m.perPhoto))),
-        ],
-        onChanged: (v) => ref
-            .read(appStateProvider.notifier)
-            .update((st) => st.ai.feature(aiMealPhoto).model = v),
-      ),
-    ];
-  }
 }
 
-/// One provider's key: set it, replace it, or clear it — but never read it back.
+/// One provider's key: set it, replace it, or clear it — but never read it back. Once it is set,
+/// this is also where that provider's own model lives, and where its connection can be tested.
 class _KeyRow extends ConsumerStatefulWidget {
-  const _KeyRow({required this.providerId, required this.isSet});
+  const _KeyRow({required this.providerId, required this.isSet, required this.cfg});
 
   final String providerId;
   final bool isSet;
+
+  /// The whole feature's config, not just this provider's slice of it — the Model picker below
+  /// needs [AiFeatureConfig.models], and `_save` needs to check whether *any* provider has been
+  /// chosen yet, not only this one.
+  final AiFeatureConfig cfg;
 
   @override
   ConsumerState<_KeyRow> createState() => _KeyRowState();
@@ -239,21 +223,40 @@ class _KeyRowState extends ConsumerState<_KeyRow> {
       _result = null;
     });
     ref.invalidate(aiConfiguredProvider);
+    // The key just added is what makes this row usable at all, so if the feature has never had a
+    // provider — nothing chosen yet, or this is the first key ever added — this is the natural
+    // moment to default it, rather than leaving the Provider row on screen quietly displaying a
+    // choice (see its own comment) that `AppState` was never actually given.
+    final notifier = ref.read(appStateProvider.notifier);
+    if (widget.cfg.provider == null) {
+      notifier.update((st) => st.ai.feature(aiMealPhoto).provider = widget.providerId);
+    }
     ref.read(uiProvider).toast(t('Key saved'));
   }
 
-  /// Sends one real request and reports whether the provider took it.
+  /// Sends one real request against the key already saved for this provider, and reports whether
+  /// it was accepted.
   ///
   /// Deliberately not a toast: the answer is a sentence about this row, it wants to stay on screen
   /// while the user acts on it, and a toast for the failure case would be gone before they had
   /// finished reading which of the three providers it was about.
-  Future<void> _test() async {
+  Future<void> _test() => _runTest(() => ref.read(aiProbeProvider)(widget.providerId));
+
+  /// The other way in: tests whatever is currently typed in the field, without saving it first.
+  /// A no-op on an empty field, the same as [_save].
+  Future<void> _testTyped() {
+    final typed = _field.text.trim();
+    if (typed.isEmpty) return Future.value();
+    return _runTest(() => ref.read(aiProbeKeyProvider)(widget.providerId, typed));
+  }
+
+  Future<void> _runTest(Future<AiFailureKind?> Function() probe) async {
     setState(() {
       _testing = true;
       _tested = false;
       _result = null;
     });
-    final kind = await ref.read(aiProbeProvider)(widget.providerId);
+    final kind = await probe();
     if (!mounted) return;
     setState(() {
       _testing = false;
@@ -268,15 +271,16 @@ class _KeyRowState extends ConsumerState<_KeyRow> {
     // Turn the feature off too if this was the provider running it, rather than leaving a switch
     // on that now points at nothing.
     final notifier = ref.read(appStateProvider.notifier);
-    final cfg = ref.read(appStateProvider).ai.features[aiMealPhoto];
-    if (cfg?.provider == widget.providerId) {
-      notifier.update((st) {
-        final f = st.ai.feature(aiMealPhoto);
+    notifier.update((st) {
+      final f = st.ai.feature(aiMealPhoto);
+      // The model chosen for this provider is meaningless once there is no key behind it — left
+      // in place it would just be a stale default the next key typed here quietly inherits.
+      f.models.remove(widget.providerId);
+      if (f.provider == widget.providerId) {
         f.provider = null;
-        f.model = null;
         f.on = false;
-      });
-    }
+      }
+    });
     setState(() {
       _editing = false;
       _tested = false;
@@ -286,41 +290,71 @@ class _KeyRowState extends ConsumerState<_KeyRow> {
     ref.read(uiProvider).toast(t('Key removed'));
   }
 
-  /// The footnote under a set key: what the last test said, or where the key lives.
+  /// What a finished test says, independent of where it is shown.
+  String _resultLine(AiFailureKind? kind) {
+    if (kind == null) return t('The key works.');
+    return switch (kind) {
+      AiFailureKind.notConfigured => t('No API key set up yet.'),
+      AiFailureKind.badKey => t('That key was refused.'),
+      AiFailureKind.offline => t('No connection.'),
+      AiFailureKind.rateLimited => t('Too many requests just now. Try again in a minute.'),
+      AiFailureKind.providerDown => t('The provider had a problem.'),
+      AiFailureKind.rejected =>
+        t('The provider would not accept the request — the model may no longer exist.'),
+      AiFailureKind.timeout => t('That took too long.'),
+      // Neither is reachable from a probe, which reads a status code and never a body — but an
+      // exhaustive switch is what makes a future kind a compile error rather than a blank line.
+      AiFailureKind.refused || AiFailureKind.unreadable => t('The provider had a problem.'),
+      AiFailureKind.cancelled => '',
+    };
+  }
+
+  /// The line under a set key: what the last test said, or where the key lives.
   ///
   /// The two share a line because they answer the same question — "is this row all right?" — and
   /// stacking them would leave a permanent reassurance sitting under a verdict that contradicts it.
-  (String, Color) _footnote(AppColors c) {
+  /// [saved] is false for the row this same state also drives while editing — an untested,
+  /// unsaved key has nothing honest to say about the keychain yet, so that idle state renders
+  /// nothing rather than a reassurance about a key that was never stored.
+  (String, Color) _footnote(AppColors c, {required bool saved}) {
     if (_testing) return (t('Testing…'), c.label3);
     if (!_tested) {
-      return (t('Stored in the phone keychain. It is not in your backup.'), c.label3);
+      return saved
+          ? (t('Stored in the phone keychain. It is not in your backup.'), c.label3)
+          : ('', c.label3);
     }
     final kind = _result;
-    if (kind == null) return (t('The key works.'), c.sys.green);
-    return (
-      switch (kind) {
-        AiFailureKind.notConfigured => t('No API key set up yet.'),
-        AiFailureKind.badKey => t('That key was refused.'),
-        AiFailureKind.offline => t('No connection.'),
-        AiFailureKind.rateLimited => t('Too many requests just now. Try again in a minute.'),
-        AiFailureKind.providerDown => t('The provider had a problem.'),
-        AiFailureKind.rejected =>
-          t('The provider would not accept the request — the model may no longer exist.'),
-        AiFailureKind.timeout => t('That took too long.'),
-        // Neither is reachable from a probe, which reads a status code and never a body — but an
-        // exhaustive switch is what makes a future kind a compile error rather than a blank line.
-        AiFailureKind.refused || AiFailureKind.unreadable => t('The provider had a problem.'),
-        AiFailureKind.cancelled => '',
-      },
-      c.sys.red,
+    return (_resultLine(kind), kind == null ? c.sys.green : c.sys.red);
+  }
+
+  /// The model picker for this specific provider, once it holds a key — independent of whether
+  /// this is the provider currently running the feature. Moved here from a single shared row so
+  /// that switching which provider is active no longer means re-choosing every other one's model
+  /// from scratch.
+  Widget? _modelRow(BuildContext context) {
+    final table = aiModels[widget.providerId];
+    if (table == null || table.isEmpty) return null;
+    final current = modelFor(widget.providerId, widget.cfg.models[widget.providerId])!;
+    return SelectRow<String>(
+      icon: 'sparkles',
+      iconTint: context.c.sys.purple,
+      title: t('Model'),
+      value: current.id,
+      options: [
+        for (final m in table)
+          // The cost sits in the subtitle rather than a footnote because this is the moment the
+          // choice is made, and it is the only number on this screen that recurs.
+          SelectOption(m.id, m.label, subtitle: t('about {0} a photo', _money(m.perPhoto))),
+      ],
+      onChanged: (v) => ref
+          .read(appStateProvider.notifier)
+          .update((st) => st.ai.feature(aiMealPhoto).models[widget.providerId] = v),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     final name = aiProviderName[widget.providerId] ?? widget.providerId;
-    final (footLine, footTint) = _footnote(c);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -336,11 +370,16 @@ class _KeyRowState extends ConsumerState<_KeyRow> {
             variant: BtnVariant.tinted,
             onTap: () => setState(() {
               _editing = !_editing;
-              if (!_editing) _field.clear();
+              _field.clear();
+              // A verdict belongs to whichever key produced it — entering edit mode retires the
+              // last saved-key test, and cancelling out retires whatever was just typed, so
+              // neither leaks into the other row's reading.
+              _tested = false;
+              _result = null;
             }),
           ),
         ),
-        if (_editing)
+        if (_editing) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(15, 0, 15, 12),
             child: Column(
@@ -366,28 +405,62 @@ class _KeyRowState extends ConsumerState<_KeyRow> {
                     ),
                   ],
                 ]),
+                // Testing a key that has not been saved yet — the whole reason to try it before
+                // committing to it. Goes through the same seam as every other request (rule 1 and
+                // rule 3 in vision_adapter.dart still hold: nothing thrown, no body surfaced) but
+                // with a throwaway in-memory store standing in for the keychain, so a failed
+                // attempt never touches it.
+                Builder(builder: (context) {
+                  final (line, tint) = _footnote(context.c, saved: false);
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(line, style: ts(TypeScale.foot, color: tint))),
+                        const SizedBox(width: 10),
+                        AppButton(
+                          t('Test'),
+                          size: BtnSize.xs,
+                          variant: BtnVariant.tinted,
+                          enabled: !_testing,
+                          onTap: _testTyped,
+                        ),
+                      ],
+                    ),
+                  );
+                }),
               ],
             ),
           ),
-        if (!_editing && widget.isSet)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(15, 0, 15, 10),
-            child: Row(
-              children: [
-                Expanded(child: Text(footLine, style: ts(TypeScale.foot, color: footTint))),
-                const SizedBox(width: 10),
-                // Beside the verdict rather than under it: this is the button that produced the
-                // sentence to its left, and pressing it again is how the sentence changes.
-                AppButton(
-                  t('Test'),
-                  size: BtnSize.xs,
-                  variant: BtnVariant.tinted,
-                  enabled: !_testing,
-                  onTap: _test,
-                ),
-              ],
+        ],
+        if (!_editing && widget.isSet) ...[
+          if (_modelRow(context) case final row?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(15, 0, 15, 0),
+              child: row,
             ),
-          ),
+          Builder(builder: (context) {
+            final (line, tint) = _footnote(context.c, saved: true);
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(15, 0, 15, 10),
+              child: Row(
+                children: [
+                  Expanded(child: Text(line, style: ts(TypeScale.foot, color: tint))),
+                  const SizedBox(width: 10),
+                  // Beside the verdict rather than under it: this is the button that produced the
+                  // sentence to its left, and pressing it again is how the sentence changes.
+                  AppButton(
+                    t('Test'),
+                    size: BtnSize.xs,
+                    variant: BtnVariant.tinted,
+                    enabled: !_testing,
+                    onTap: _test,
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ],
     );
   }

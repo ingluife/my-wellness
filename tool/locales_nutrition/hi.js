@@ -71,6 +71,7 @@ export default {
   "Grams": "ग्राम",
   "Height": "कद",
   "Held at the floor": "न्यूनतम पर रोका गया",
+  "How many": "कितने",
   "How old are you?": "आपकी उम्र क्या है?",
   "How tall are you?": "आपका कद कितना है?",
   "How this was worked out": "यह कैसे निकाला गया",

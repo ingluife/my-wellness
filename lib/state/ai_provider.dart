@@ -88,18 +88,43 @@ HttpVisionAdapter adapterFor(String providerId, AiModel model, AiKeyStore keys) 
 /// screen without a socket. The adapter it builds lives exactly as long as the request and is
 /// closed either way, so a screen that is never tapped still holds no client.
 ///
-/// The model it tests with is the one the user would actually spend money on: whatever they chose,
-/// if this is the provider the feature points at, and the provider's default otherwise. Testing
-/// some other model would pass while the configured one 404s.
+/// The model it tests with is the one the user would actually spend money on: whatever is chosen
+/// for [providerId] specifically — each provider keeps its own choice in `AiFeatureConfig.models`
+/// now, so this reads straight off that regardless of which provider currently runs the feature.
+/// Testing some other model would pass while the configured one 404s.
 final aiProbeProvider = Provider<Future<AiFailureKind?> Function(String)>((ref) {
   return (providerId) async {
     if (!aiProviders.contains(providerId)) return AiFailureKind.notConfigured;
 
     final cfg = ref.read(appStateProvider).ai.features[aiMealPhoto];
-    final model = modelFor(providerId, cfg?.provider == providerId ? cfg?.model : null);
+    final model = modelFor(providerId, cfg?.models[providerId]);
     if (model == null) return AiFailureKind.notConfigured;
 
     final adapter = adapterFor(providerId, model, ref.read(aiKeyStoreProvider));
+    try {
+      return await adapter.probe();
+    } finally {
+      adapter.close();
+    }
+  };
+});
+
+/// The same test, against a key the user has typed but not yet saved.
+///
+/// The one place a key that never touched the keychain is allowed to exist at all, and only for
+/// the lifetime of this one request: [MemoryAiKeyStore] holds it in a local variable, the adapter
+/// reads it once, and both are discarded when the call returns. Nothing about this path writes to
+/// [aiKeyStoreProvider] — testing must not be a backdoor around Save.
+final aiProbeKeyProvider =
+    Provider<Future<AiFailureKind?> Function(String providerId, String key)>((ref) {
+  return (providerId, key) async {
+    if (!aiProviders.contains(providerId)) return AiFailureKind.notConfigured;
+
+    final cfg = ref.read(appStateProvider).ai.features[aiMealPhoto];
+    final model = modelFor(providerId, cfg?.models[providerId]);
+    if (model == null) return AiFailureKind.notConfigured;
+
+    final adapter = adapterFor(providerId, model, MemoryAiKeyStore({providerId: key}));
     try {
       return await adapter.probe();
     } finally {

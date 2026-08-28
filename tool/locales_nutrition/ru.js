@@ -71,6 +71,7 @@ export default {
   "Grams": "Граммы",
   "Height": "Рост",
   "Held at the floor": "Удержано на минимуме",
+  "How many": "Сколько",
   "How old are you?": "Сколько тебе лет?",
   "How tall are you?": "Какой у тебя рост?",
   "How this was worked out": "Как это посчитано",

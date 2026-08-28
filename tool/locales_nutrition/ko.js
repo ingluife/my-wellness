@@ -71,6 +71,7 @@ export default {
   "Grams": "그램",
   "Height": "키",
   "Held at the floor": "하한선에 고정됨",
+  "How many": "개수",
   "How old are you?": "나이가 어떻게 되나요?",
   "How tall are you?": "키가 어떻게 되나요?",
   "How this was worked out": "이 값이 계산된 방법",

@@ -46,16 +46,23 @@ void main() {
   late List<String> probed;
   setUp(() => probed = []);
 
+  /// The same, for the typed-but-unsaved path — provider id and the literal string it was asked
+  /// to test, so a test can prove Save never ran behind it.
+  late List<(String, String)> probedKeys;
+  setUp(() => probedKeys = []);
+
   /// Builds the real app with an in-memory key store — no keychain, no platform channel.
   ///
   /// [probe] stands in for the connection test's round trip: null for "it worked", a kind for a
   /// failure. Left as a fake because the real one is a socket; what it actually sends is covered
-  /// against a fake client in ai_adapter_test.dart.
+  /// against a fake client in ai_adapter_test.dart. [probeKey] is the same for the unsaved-key
+  /// path.
   Future<(ProviderContainer, MemoryAiKeyStore)> pump(
     WidgetTester tester, {
     Map<String, String>? keys,
     AppState? initial,
     AiFailureKind? probe,
+    AiFailureKind? probeKey,
   }) async {
     final store = MemoryAiKeyStore(keys);
     final container = ProviderContainer(
@@ -65,6 +72,10 @@ void main() {
         aiProbeProvider.overrideWithValue((id) async {
           probed.add(id);
           return probe;
+        }),
+        aiProbeKeyProvider.overrideWithValue((id, key) async {
+          probedKeys.add((id, key));
+          return probeKey;
         }),
       ],
     );
@@ -144,9 +155,53 @@ void main() {
 
     final cfg = container.read(appStateProvider).ai.features[aiMealPhoto];
     expect(cfg?.isOn, isTrue);
+    // The bug this guards: the Provider row displays the one usable provider as already chosen
+    // (see its own "value: chosen ?? usable.first" comment) whether or not anything was ever
+    // written to state. With only one provider there is nothing left to pick, so turning the
+    // switch on has to be the moment that choice becomes real — otherwise the switch reads as on
+    // while `aiMealPhotoProvider` still sees no provider and stays disabled forever.
+    expect(cfg?.provider, 'anthropic');
 
     // And the state now writes the key it did not write before.
     expect(container.read(appStateProvider).toJson().containsKey('ai'), isTrue);
+    container.dispose();
+  });
+
+  testWidgets('adding the first key defaults the provider, not only the switch',
+      (tester) async {
+    // The other half of the same bug, reached the other way round: a key can be added before the
+    // switch is ever touched, and the same silent gap would leave the feature stuck off even once
+    // the switch is turned on afterwards through a fresh rebuild that never re-runs this logic.
+    final (container, _) = await pump(tester);
+
+    await press(tester, find.text('Add').first);
+    await tester.enterText(find.byType(AppTextField), 'sk-ant-x');
+    await tester.pumpAndSettle();
+    await press(tester, find.text('Save'));
+
+    final cfg = container.read(appStateProvider).ai.features[aiMealPhoto];
+    expect(cfg?.provider, 'anthropic');
+    // Saving a key is not the same as turning the feature on — that is still a separate, explicit
+    // step.
+    expect(cfg?.isOn ?? false, isFalse);
+    container.dispose();
+  });
+
+  testWidgets('a second key does not steal the provider the first one set', (tester) async {
+    // Auto-selecting is only for "nothing chosen yet". A user who already has a real choice on
+    // record — made either explicitly or by the same default — must not have it silently swapped
+    // out from under them by adding a second provider's key.
+    final initial = AppState.defaults();
+    initial.ai.feature(aiMealPhoto).provider = 'anthropic';
+    final (container, _) =
+        await pump(tester, keys: {'anthropic': 'sk-ant-x'}, initial: initial);
+
+    await press(tester, find.text('Add').first);
+    await tester.enterText(find.byType(AppTextField), 'g-key');
+    await tester.pumpAndSettle();
+    await press(tester, find.text('Save'));
+
+    expect(container.read(appStateProvider).ai.features[aiMealPhoto]?.provider, 'anthropic');
     container.dispose();
   });
 
@@ -209,11 +264,163 @@ void main() {
     // Gemini names, not Claude ones — the model table is per provider. findsWidgets rather than
     // findsOneWidget because the selected model shows on the row as well as in the chooser.
     expect(find.text('Gemini 3.7 Flash'), findsWidgets);
-    expect(find.text('Gemini 3.1 Pro'), findsWidgets);
+    expect(find.text('Gemini 3.6 Flash'), findsWidgets);
     expect(find.textContaining('Claude'), findsNothing);
     // ...and the per-photo cost shown is Gemini's, not a figure carried over from another table.
     expect(find.textContaining('a photo'), findsWidgets);
     container.dispose();
+  });
+
+  testWidgets('a model can be set for a provider that is not the active one', (tester) async {
+    // The whole point of moving Model onto each provider's own row: it is not gated on that
+    // provider currently being the one running the feature. Setting Google's model while
+    // Anthropic is active must not require switching to Google first.
+    final initial = AppState.defaults();
+    initial.ai.feature(aiMealPhoto)
+      ..on = true
+      ..provider = 'anthropic';
+
+    final (container, _) = await pump(
+      tester,
+      keys: {'anthropic': 'sk-ant-x', 'google': 'g-key'},
+      initial: initial,
+    );
+
+    // Google's own Model row, reached without ever touching the Provider selector above. It
+    // reads Gemini 3.6 Flash because that is the table's first entry and so its default — see
+    // aiModels, where Google deliberately does not lead with Pro.
+    await press(tester, find.text('Gemini 3.6 Flash').first);
+    await press(tester, find.text('Gemini 3.7 Flash').last);
+
+    final cfg = container.read(appStateProvider).ai.feature(aiMealPhoto);
+    expect(cfg.models['google'], 'gemini-3.7-flash');
+    // The active provider and its own model are untouched by choosing a model for a different one.
+    expect(cfg.provider, 'anthropic');
+    container.dispose();
+  });
+
+  testWidgets('switching the active provider does not forget a model chosen earlier',
+      (tester) async {
+    // The bug a single shared field had: picking Flash for Google, moving to Anthropic, then
+    // back to Google, used to land back on Google's default (Pro) because switching away cleared
+    // it. Each provider now keeps its own choice regardless of which one is active.
+    final initial = AppState.defaults();
+    initial.ai.feature(aiMealPhoto)
+      ..on = true
+      ..provider = 'google'
+      ..models['google'] = 'gemini-3.7-flash';
+
+    final (container, _) = await pump(
+      tester,
+      keys: {'anthropic': 'sk-ant-x', 'google': 'g-key'},
+      initial: initial,
+    );
+
+    await press(tester, find.text('Provider'));
+    await press(tester, find.text('Anthropic').last);
+    await press(tester, find.text('Provider'));
+    await press(tester, find.text('Google').last);
+
+    expect(container.read(appStateProvider).ai.feature(aiMealPhoto).models['google'],
+        'gemini-3.7-flash');
+    container.dispose();
+  });
+
+  testWidgets('removing a key drops the model chosen for it', (tester) async {
+    // A stale choice sitting under a provider with no key left is not a default worth keeping —
+    // the next key typed here should not silently inherit whatever the old one had picked.
+    final initial = AppState.defaults();
+    initial.ai.feature(aiMealPhoto)
+      ..on = true
+      ..provider = 'anthropic'
+      ..models['anthropic'] = 'claude-haiku-4-5';
+
+    final (container, _) =
+        await pump(tester, keys: {'anthropic': 'sk-ant-x'}, initial: initial);
+
+    await press(tester, find.text('Replace').first);
+    await press(tester, find.text('Remove'));
+
+    expect(container.read(appStateProvider).ai.feature(aiMealPhoto).models, isEmpty);
+    container.dispose();
+  });
+
+  group('testing a key before it is saved', () {
+    testWidgets('the Test button is offered while typing, before Save', (tester) async {
+      final (container, store) = await pump(tester);
+
+      await press(tester, find.text('Add').first);
+      await tester.enterText(find.byType(AppTextField), 'sk-ant-not-saved-yet');
+      await tester.pumpAndSettle();
+
+      await press(tester, find.text('Test').first);
+
+      expect(probedKeys, [('anthropic', 'sk-ant-not-saved-yet')]);
+      // The point of the whole feature: nothing was written to the keychain or to state by
+      // testing it, only by Save.
+      expect(await store.read('anthropic'), isNull);
+      expect(container.read(appStateProvider).ai.features[aiMealPhoto], isNull);
+      container.dispose();
+    });
+
+    testWidgets('a good result reads the same way it does for a saved key', (tester) async {
+      final (container, _) =
+          await pump(tester, probeKey: null /* success */);
+
+      await press(tester, find.text('Add').first);
+      await tester.enterText(find.byType(AppTextField), 'sk-ant-good');
+      await tester.pumpAndSettle();
+      await press(tester, find.text('Test').first);
+
+      expect(find.text('The key works.'), findsOneWidget);
+      container.dispose();
+    });
+
+    testWidgets('an empty field does nothing, the same as Save', (tester) async {
+      final (container, _) = await pump(tester);
+      await press(tester, find.text('Add').first);
+      await press(tester, find.text('Test').first);
+
+      expect(probedKeys, isEmpty);
+      container.dispose();
+    });
+
+    testWidgets('cancelling out does not leave the verdict behind for the next key',
+        (tester) async {
+      // A test result is a claim about the string that was typed. Leaving it on screen after
+      // Cancel would attach that claim to whatever gets typed next instead.
+      final (container, _) = await pump(tester, probeKey: AiFailureKind.badKey);
+
+      await press(tester, find.text('Add').first);
+      await tester.enterText(find.byType(AppTextField), 'sk-ant-bad');
+      await tester.pumpAndSettle();
+      await press(tester, find.text('Test').first);
+      expect(find.text('That key was refused.'), findsOneWidget);
+
+      await press(tester, find.text('Cancel'));
+      await press(tester, find.text('Add').first);
+      expect(find.text('That key was refused.'), findsNothing);
+      container.dispose();
+    });
+
+    testWidgets('replacing a key can be tested before it overwrites the old one',
+        (tester) async {
+      final (container, store) = await pump(
+        tester,
+        keys: {'anthropic': 'sk-ant-original'},
+        probeKey: AiFailureKind.badKey,
+      );
+
+      await press(tester, find.text('Replace').first);
+      await tester.enterText(find.byType(AppTextField), 'sk-ant-typo');
+      await tester.pumpAndSettle();
+      await press(tester, find.text('Test').first);
+
+      expect(probedKeys, [('anthropic', 'sk-ant-typo')]);
+      // The original key survives an unsaved, failed test of its replacement.
+      expect(await store.read('anthropic'), 'sk-ant-original');
+      container.dispose();
+    });
   });
 
   testWidgets('keeping photos is offered only once the feature is on', (tester) async {
