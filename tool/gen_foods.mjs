@@ -48,6 +48,12 @@ const AMBIGUOUS_UNIT = /^(oz|lb|lbs|fl oz|g|kg|mg|ml|l|liter|litre|gram|grams|po
 // "package = 926 g"; broccoli offers "bunch = 608 g". Both are true and neither is a meal.
 const BULK = /package|bunch|as purchased|container|carton|bottle|\bcan\b|\bbox\b|\bbag\b|loaf|\bhead\b|crust not eaten|yields|refuse/i
 
+// A brand name that survived the parenthetical strip below ('cookie Pepperidge Farm...',
+// 'Toaster Strudel') rather than being tucked inside '(include ...)' like most are. Two
+// consecutive capitalized words is the same shape a brand name has and nothing else in this
+// dataset's portion labels does, once parentheticals are gone.
+const BRANDED = /\b[A-Z][a-zA-Z']*\s+[A-Z][a-zA-Z']*\b/
+
 // The units people actually think in, most natural first. A portion whose label is one of
 // these leads, so eggs offer "medium" before "cup" and bread offers "slice" before "cup, cubes".
 const NATURAL = [
@@ -82,7 +88,7 @@ function portionsOf(rec) {
     label = label.replace(/^nlea serving$/i, 'serving')
     // Parenthetical sizing ('fruit (2-3/8" dia)') is precision nobody eats by.
     label = label.replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim()
-    if (!label || AMBIGUOUS_UNIT.test(label) || BULK.test(label)) continue
+    if (!label || AMBIGUOUS_UNIT.test(label) || BULK.test(label) || BRANDED.test(label)) continue
 
     const key = label.toLowerCase()
     if (seen.has(key)) continue

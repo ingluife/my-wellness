@@ -52,7 +52,10 @@ const _minGrams = 30.0;
 /// a plate with.
 double _ceilingFor(Food f) => switch (f.kcal) {
       >= 600 => 30, // oils, butter, nut butters — a spoonful
-      >= 350 => 60, // hard cheese, nuts, dried fruit — a handful
+      // Brie sits at 334, in the gap this band used to open at 350 rather than 300 — the same
+      // gap a pastry or a milkshake now also falls into. The boundary belongs at 300 because
+      // that is where the whole-catalogue test below draws the "rich food" line.
+      >= 300 => 60, // hard cheese, nuts, dried fruit, pastries — a handful
       >= 200 => 180, // bread, cured meat, grain by dry weight
       >= 80 => 300, // cooked grains, lean meat, fish — the body of a meal
       _ => 250, // vegetables, fruit, milk, drinks
