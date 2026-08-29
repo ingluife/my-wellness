@@ -83,7 +83,7 @@ class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBinding
     if (I18n.instance.lang != lang) I18n.instance.setLang(lang);
 
     return MaterialApp.router(
-      title: 'openGym',
+      title: 'My Wellness',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(
         theme == 'light' ? Brightness.light : Brightness.dark,
