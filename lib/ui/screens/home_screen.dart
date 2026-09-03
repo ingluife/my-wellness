@@ -505,7 +505,10 @@ class _WeekDay extends ConsumerWidget {
 
     return Pressable.builder(
       scale: 1,
-      onTap: () => dayOverrideSheet(iso),
+      // A past day can only be reviewed — same recap the month calendar opens; today and
+      // future days still open the planner.
+      onTap: () =>
+          iso.compareTo(todayISO()) < 0 ? daySummarySheet(iso) : dayOverrideSheet(iso),
       build: (context, pressed) => AnimatedContainer(
         duration: Motion.fast,
         padding: const EdgeInsets.fromLTRB(2, 8, 2, 9),
