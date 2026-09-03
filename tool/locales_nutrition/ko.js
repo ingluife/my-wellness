@@ -800,6 +800,7 @@ export default {
   // — AI workout plans —
   "A day could not be scheduled and was left empty.": "하루는 배정하지 못해 비워 두었습니다.",
   "A repeated exercise was kept once.": "중복된 운동은 한 번만 남겼습니다.",
+  "A small file a friend imports into their own My Wellness — routines only, none of your workouts or weigh-ins.": "친구가 자신의 My Wellness에 가져올 수 있는 작은 파일 — 루틴만 포함되며 운동 기록이나 체중은 포함되지 않습니다.",
   "A weekly split": "주간 분할 루틴",
   "Added {0} routine to your plan": "계획에 루틴 {0}개를 추가했습니다",
   "Anything else? (optional)": "더 있나요? (선택)",
@@ -845,6 +846,7 @@ export default {
   "Your plan": "내 계획",
   "Your routine": "내 루틴",
   "about {0} a photo · {1} a plan": "사진당 약 {0} · 계획당 {1}",
+  "this isn’t a My Wellness plan file": "My Wellness 계획 파일이 아닙니다",
   "{0} min": "{0}분",
   "{0} routines saved": "루틴 {0}개가 저장되었습니다",
 }

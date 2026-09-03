@@ -28,7 +28,7 @@ void main() {
 
   test('a bundle carries the plan and nothing else', () {
     final bundle = buildPlanBundle(withStarter(), 'Luis’s plan');
-    expect(bundle['opengym_plan'], 1);
+    expect(bundle['mywellness_plan'], 1);
     expect(bundle['name'], 'Luis’s plan');
     expect((bundle['routines'] as List), hasLength(3));
     expect((bundle['week'] as Map).keys, ['1', '3', '5']);
@@ -134,7 +134,7 @@ void main() {
 
   test('an exercise nothing can resolve is dropped and counted, not left invisible', () {
     final bundle = parsePlan(jsonEncode({
-      'opengym_plan': 1,
+      'mywellness_plan': 1,
       'routines': [
         {
           'id': 'r',
@@ -153,7 +153,7 @@ void main() {
   test('anything that is not a plan file is refused with a readable message', () {
     expect(() => parsePlan('not json'), throwsA(isA<FormatException>()));
     expect(() => parsePlan('{"workouts":[]}'), throwsA(isA<FormatException>()));
-    expect(() => parsePlan('{"opengym_plan":1}'), throwsA(isA<FormatException>()));
+    expect(() => parsePlan('{"mywellness_plan":1}'), throwsA(isA<FormatException>()));
   });
 
   test('the bundle counts what it is about to add', () {
@@ -166,7 +166,7 @@ void main() {
   test('a single-routine file carries that routine only, and no week', () {
     final s = withStarter();
     final bundle = buildRoutineBundle(s, s.routines[1]);
-    expect(bundle['opengym_plan'], 1);
+    expect(bundle['mywellness_plan'], 1);
     // The name rides in the envelope so the other end's sheet says which routine it is.
     expect(bundle['name'], s.routines[1].name);
     expect((bundle['routines'] as List), hasLength(1));
@@ -275,11 +275,11 @@ void main() {
 
   test('the share file name survives any routine name', () {
     expect(routineFileName(Routine(id: 'r', name: 'Push Day')),
-        'opengym-routine-push-day-${todayISO()}.json');
+        'mywellness-routine-push-day-${todayISO()}.json');
     expect(routineFileName(Routine(id: 'r', name: '  Legs / Core!! ')),
-        'opengym-routine-legs-core-${todayISO()}.json');
+        'mywellness-routine-legs-core-${todayISO()}.json');
     // Nothing sluggable left — the real name still travels inside the file.
     expect(routineFileName(Routine(id: 'r', name: '推日')),
-        'opengym-routine-routine-${todayISO()}.json');
+        'mywellness-routine-routine-${todayISO()}.json');
   });
 }

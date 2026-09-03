@@ -800,6 +800,7 @@ export default {
   // — AI workout plans —
   "A day could not be scheduled and was left empty.": "Bir gün planlanamadı ve boş bırakıldı.",
   "A repeated exercise was kept once.": "Tekrarlanan bir egzersiz bir kez tutuldu.",
+  "A small file a friend imports into their own My Wellness — routines only, none of your workouts or weigh-ins.": "Bir arkadaşının kendi My Wellness'ine aktardığı küçük bir dosya — yalnızca rutinler, antrenmanların veya tartıların değil.",
   "A weekly split": "Haftalık bir program",
   "Added {0} routine to your plan": "Planına {0} rutin eklendi",
   "Anything else? (optional)": "Başka bir şey? (isteğe bağlı)",
@@ -845,6 +846,7 @@ export default {
   "Your plan": "Planın",
   "Your routine": "Rutinin",
   "about {0} a photo · {1} a plan": "fotoğraf başına yaklaşık {0} · plan başına {1}",
+  "this isn’t a My Wellness plan file": "bu bir My Wellness plan dosyası değil",
   "{0} min": "{0} dk",
   "{0} routines saved": "{0} rutin kaydedildi",
 }

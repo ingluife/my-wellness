@@ -270,7 +270,7 @@ class _PlanTools extends ConsumerWidget {
             close();
             try {
               await Backup.shareJson(
-                  buildPlanBundle(s, ''), 'opengym-plan-${todayISO()}.json');
+                  buildPlanBundle(s, ''), 'mywellness-plan-${todayISO()}.json');
             } catch (_) {
               // The share sheet was dismissed.
             }
@@ -279,7 +279,7 @@ class _PlanTools extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(2, 7, 2, 0),
           child: Text(
-            t('A small file a friend imports into their own openGym — routines only, none of your workouts or weigh-ins.'),
+            t('A small file a friend imports into their own My Wellness — routines only, none of your workouts or weigh-ins.'),
             style: ts(TypeScale.foot, color: c.label3),
           ),
         ),
@@ -301,7 +301,7 @@ class _PlanTools extends ConsumerWidget {
             bundle = parsePlan(raw);
           } catch (e) {
             ref.read(uiProvider).toast(
-                t('Import failed: {0}', t('this isn’t an openGym plan file')));
+                t('Import failed: {0}', t('this isn’t a My Wellness plan file')));
             return;
           }
           close();

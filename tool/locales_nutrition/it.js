@@ -800,6 +800,7 @@ export default {
   // — AI workout plans —
   "A day could not be scheduled and was left empty.": "Un giorno non è stato pianificato ed è rimasto vuoto.",
   "A repeated exercise was kept once.": "Un esercizio ripetuto è stato tenuto una sola volta.",
+  "A small file a friend imports into their own My Wellness — routines only, none of your workouts or weigh-ins.": "Un piccolo file che un amico importa nel suo My Wellness — solo le routine, nessuno dei tuoi allenamenti o pesate.",
   "A weekly split": "Una divisione settimanale",
   "Added {0} routine to your plan": "Aggiunta {0} routine al tuo piano",
   "Anything else? (optional)": "Altro? (facoltativo)",
@@ -845,6 +846,7 @@ export default {
   "Your plan": "Il tuo piano",
   "Your routine": "La tua scheda",
   "about {0} a photo · {1} a plan": "circa {0} a foto · {1} a piano",
+  "this isn’t a My Wellness plan file": "questo non è un file di piano My Wellness",
   "{0} min": "{0} min",
   "{0} routines saved": "{0} schede salvate",
 }

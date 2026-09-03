@@ -88,7 +88,7 @@ Map<String, dynamic> _bundle(AppState s, String name, Iterable<Routine> from,
     }
   }
   return {
-    'opengym_plan': _planFormat,
+    'mywellness_plan': _planFormat,
     'exported': todayISO(),
     'name': name,
     'week': week,
@@ -120,13 +120,12 @@ String _slug(String name) {
   return out.isEmpty ? 'routine' : out;
 }
 
-/// What a shared routine file is called. `opengym-` matches the plan and backup files, and the
-/// `opengym_plan` marker inside them — the wire format did not change when the app was renamed.
+/// What a shared routine file is called, matching the plan and backup files.
 ///
 /// A name with nothing sluggable in it (`推日`) falls back to `routine`; the real name still
 /// travels inside the file and is what the other end's import sheet shows.
 String routineFileName(Routine r) =>
-    'opengym-routine-${_slug(r.name)}-${todayISO()}.json';
+    'mywellness-routine-${_slug(r.name)}-${todayISO()}.json';
 
 /// A plan file, validated and counted.
 class PlanBundle {
@@ -165,12 +164,12 @@ PlanBundle parsePlan(String raw) {
   try {
     decoded = jsonDecode(raw);
   } catch (_) {
-    throw FormatException(t('this isn’t an openGym plan file'));
+    throw FormatException(t('this isn’t a My Wellness plan file'));
   }
   if (decoded is! Map ||
-      decoded['opengym_plan'] == null ||
+      decoded['mywellness_plan'] == null ||
       decoded['routines'] is! List) {
-    throw FormatException(t('this isn’t an openGym plan file'));
+    throw FormatException(t('this isn’t a My Wellness plan file'));
   }
   final data = Map<String, dynamic>.from(decoded);
 

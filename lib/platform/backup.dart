@@ -16,7 +16,7 @@ import '../domain/format.dart';
 class Backup {
   const Backup._();
 
-  static String fileName() => 'opengym-backup-${todayISO()}.json';
+  static String fileName() => 'mywellness-backup-${todayISO()}.json';
 
   /// Write [state] to a temp file and hand it to the share sheet.
   static Future<void> export(AppState state, {String? name}) async {
@@ -54,14 +54,14 @@ class Backup {
   /// Parse a backup, refusing anything that is not one.
   ///
   /// The check is deliberately shallow — `routines` and `workouts` present — because that is
-  /// what makes a file an openGym backup, and a stricter schema would reject files written by
-  /// a version this build does not know about.
+  /// what makes a file a backup, and a stricter schema would reject files written by a version
+  /// this build does not know about.
   static AppState parse(String raw) {
     final data = jsonDecode(raw);
     if (data is! Map<String, dynamic> ||
         !data.containsKey('workouts') ||
         !data.containsKey('routines')) {
-      throw const FormatException('not an openGym backup');
+      throw const FormatException('not a My Wellness backup');
     }
     return AppState.fromJson(data);
   }

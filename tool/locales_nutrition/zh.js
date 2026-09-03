@@ -800,6 +800,7 @@ export default {
   // — AI workout plans —
   "A day could not be scheduled and was left empty.": "有一天无法安排，已留空。",
   "A repeated exercise was kept once.": "重复的练习只保留了一次。",
+  "A small file a friend imports into their own My Wellness — routines only, none of your workouts or weigh-ins.": "一个小文件，朋友可以导入到自己的 My Wellness——只有训练日，不包含你的训练记录或体重。",
   "A weekly split": "每周分化训练",
   "Added {0} routine to your plan": "已向你的计划添加 {0} 个课表",
   "Anything else? (optional)": "还有别的吗？（可选）",
@@ -845,6 +846,7 @@ export default {
   "Your plan": "你的计划",
   "Your routine": "你的课表",
   "about {0} a photo · {1} a plan": "每张照片约 {0} · 每份计划约 {1}",
+  "this isn’t a My Wellness plan file": "这不是 My Wellness 计划文件",
   "{0} min": "{0} 分钟",
   "{0} routines saved": "已保存 {0} 套课表",
 }

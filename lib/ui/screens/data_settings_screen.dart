@@ -158,7 +158,7 @@ Future<void> importBackupFile(WidgetRef ref) async {
   try {
     next = Backup.parse(raw);
   } catch (e) {
-    ref.read(uiProvider).toast(t('Import failed: {0}', 'not an openGym backup'));
+    ref.read(uiProvider).toast(t('Import failed: {0}', 'not a My Wellness backup'));
     return;
   }
   confirmSheet(

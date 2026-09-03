@@ -800,6 +800,7 @@
   "plan": [
     "A day could not be scheduled and was left empty.",
     "A repeated exercise was kept once.",
+    "A small file a friend imports into their own My Wellness — routines only, none of your workouts or weigh-ins.",
     "A weekly split",
     "Added {0} routine to your plan",
     "Anything else? (optional)",
@@ -845,6 +846,7 @@
     "Your plan",
     "Your routine",
     "about {0} a photo · {1} a plan",
+    "this isn’t a My Wellness plan file",
     "{0} min",
     "{0} routines saved"
   ]
