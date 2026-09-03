@@ -18,8 +18,40 @@ jobs:
   build-and-distribute:
     runs-on: ubuntu-latest
     environment: Production
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch the exercise media
+        # assets/img and assets/gif (1,324 stills + 1,324 animations, ~121 MB packed)
+        # are declared in pubspec.yaml but git-ignored, so a fresh checkout has neither
+        # directory and `flutter build apk` fails. They are published as the
+        # `media.tar.gz` asset on a release of this (private) repo — `gh` authenticates
+        # with the built-in token, so no extra secret is needed. See
+        # docs/ci-app-distribution.md and tool/sync_media.sh.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MEDIA_RELEASE_TAG: ${{ vars.MEDIA_RELEASE_TAG || 'media-v1' }}
+        run: |
+          set -euo pipefail
+          gh release download "$MEDIA_RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern media.tar.gz \
+            --output media.tar.gz
+          mkdir -p assets
+          tar -xzf media.tar.gz -C assets
+          test "$(find assets/img -type f | wc -l)" -eq 1324
+          test "$(find assets/gif -type f | wc -l)" -eq 1324
+
+      - name: Fetch the food photography
+        # Not a hard gate: every food falls back to its category glyph when its photo
+        # is missing, and the source is a public API nobody here controls.
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          ./tool/sync_food_media.sh || true
+          echo "food images: $(find assets/food -name '*.jpg' | wc -l)"
 
       - uses: subosito/flutter-action@v2
         with:
@@ -30,12 +62,6 @@ jobs:
       # Secrets referenced below must exist under Settings → Secrets and
       # variables → Actions before this workflow can succeed — see
       # docs/ci-app-distribution.md.
-      - name: Restore Firebase Android config
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > android/app/google-services.json
-
-      - name: Restore Dart Firebase options
-        run: echo "${{ secrets.FIREBASE_OPTIONS_DART_BASE64 }}" | base64 -d > lib/firebase_options.dart
-
       - name: Restore release keystore
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
 
