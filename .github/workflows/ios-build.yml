@@ -4,8 +4,6 @@ name: iOS · build
 # allow installing outside the App Store, so there is no artifact here worth handing anyone —
 # the value is catching a break in the iOS build the day it happens rather than months later.
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 concurrency:
