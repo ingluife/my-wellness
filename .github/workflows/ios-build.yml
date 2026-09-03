@@ -5,7 +5,6 @@ name: iOS · build
 # the value is catching a break in the iOS build the day it happens rather than months later.
 on:
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
