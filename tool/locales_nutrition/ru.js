@@ -730,6 +730,7 @@ export default {
   "Yogurt and honey": "Йогурт с мёдом",
 
   // — AI features and meal photos —
+  "A food was matched to something similar — check it.": "Один продукт сопоставлен с чем-то похожим — проверьте.",
   "A portion looked implausible and was capped.": "Одна порция выглядела неправдоподобно и была ограничена.",
   "AI features": "Функции ИИ",
   "AI providers": "Провайдеры ИИ",
@@ -750,6 +751,7 @@ export default {
   "No API key set up yet.": "Ключ API ещё не настроен.",
   "No connection.": "Нет соединения.",
   "No connection. Log it by hand — the numbers are the same.": "Нет соединения. Запишите вручную — числа те же.",
+  "Not in your foods": "Нет в ваших продуктах",
   "Nothing in that photo matched a food.": "Ничто на этом фото не совпало с продуктом.",
   "Off unless you set it up, and it runs on your own provider account.": "Выключено, пока вы не настроите, и работает через ваш собственный аккаунт у провайдера.",
   "Only the largest items were kept.": "Оставлены только самые крупные позиции.",
@@ -763,6 +765,7 @@ export default {
   "Reading the photo": "Читаем фото",
   "Remove": "Удалить",
   "Replace": "Заменить",
+  "Save as a new food": "Сохранить как новый продукт",
   "Set up meal photos": "Настроить фото приёмов пищи",
   "Some foods were not in the catalogue.": "Некоторых продуктов не было в каталоге.",
   "Something could not be identified and was left out.": "Что-то не удалось распознать, и оно было пропущено.",

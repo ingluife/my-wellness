@@ -730,6 +730,7 @@ export default {
   "Yogurt and honey": "Ballı yoğurt",
 
   // — AI features and meal photos —
+  "A food was matched to something similar — check it.": "Bir besin benzer bir şeyle eşleştirildi — kontrol et.",
   "A portion looked implausible and was capped.": "Bir porsiyon inandırıcı görünmedi ve sınırlandırıldı.",
   "AI features": "Yapay zekâ özellikleri",
   "AI providers": "Yapay zekâ sağlayıcıları",
@@ -750,6 +751,7 @@ export default {
   "No API key set up yet.": "Henüz bir API anahtarı ayarlanmadı.",
   "No connection.": "Bağlantı yok.",
   "No connection. Log it by hand — the numbers are the same.": "Bağlantı yok. Elle kaydet — sayılar aynı.",
+  "Not in your foods": "Besinlerinde yok",
   "Nothing in that photo matched a food.": "Bu fotoğrafta hiçbir şey bir besinle eşleşmedi.",
   "Off unless you set it up, and it runs on your own provider account.": "Sen ayarlayana kadar kapalı ve kendi sağlayıcı hesabın üzerinden çalışır.",
   "Only the largest items were kept.": "Yalnızca en büyük öğeler tutuldu.",
@@ -763,6 +765,7 @@ export default {
   "Reading the photo": "Fotoğraf okunuyor",
   "Remove": "Kaldır",
   "Replace": "Değiştir",
+  "Save as a new food": "Yeni besin olarak kaydet",
   "Set up meal photos": "Öğün fotoğraflarını ayarla",
   "Some foods were not in the catalogue.": "Bazı besinler katalogda yoktu.",
   "Something could not be identified and was left out.": "Bir şey tanımlanamadı ve dışarıda bırakıldı.",

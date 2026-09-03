@@ -730,6 +730,7 @@ export default {
   "Yogurt and honey": "Yaourt au miel",
 
   // — AI features and meal photos —
+  "A food was matched to something similar — check it.": "Un aliment a été associé à quelque chose de similaire — vérifie-le.",
   "A portion looked implausible and was capped.": "Une portion semblait invraisemblable et a été plafonnée.",
   "AI features": "Fonctions IA",
   "AI providers": "Fournisseurs d'IA",
@@ -750,6 +751,7 @@ export default {
   "No API key set up yet.": "Aucune clé d'API configurée pour l'instant.",
   "No connection.": "Pas de connexion.",
   "No connection. Log it by hand — the numbers are the same.": "Pas de connexion. Enregistre-le à la main — les chiffres sont les mêmes.",
+  "Not in your foods": "Pas dans tes aliments",
   "Nothing in that photo matched a food.": "Rien sur cette photo ne correspondait à un aliment.",
   "Off unless you set it up, and it runs on your own provider account.": "Désactivé tant que tu ne le configures pas, et cela passe par ton propre compte fournisseur.",
   "Only the largest items were kept.": "Seuls les éléments les plus importants ont été gardés.",
@@ -763,6 +765,7 @@ export default {
   "Reading the photo": "Lecture de la photo",
   "Remove": "Supprimer",
   "Replace": "Remplacer",
+  "Save as a new food": "Enregistrer comme nouvel aliment",
   "Set up meal photos": "Configurer les photos de repas",
   "Some foods were not in the catalogue.": "Certains aliments n'étaient pas dans le catalogue.",
   "Something could not be identified and was left out.": "Quelque chose n'a pas pu être identifié et a été laissé de côté.",

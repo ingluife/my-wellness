@@ -340,12 +340,49 @@ class _MealPhotoSheetState extends ConsumerState<_MealPhotoSheet> {
     final item = _items[index];
     final macros = item.toMealItem();
 
+    // The gram chips and, for a food the app does not have, the way to keep it. One row rather
+    // than two: they are the same kind of thing — a tap that changes what this line will log.
+    final chips = <Widget>[
+      if (item.gramsLow < item.gramsHigh)
+        for (final g in {item.gramsLow, item.grams, item.gramsHigh})
+          AppChip(
+            '${g.round()} ${t('g')}',
+            selected: (g - item.grams).abs() < 0.5,
+            capitalize: false,
+            onTap: () => setState(() => _items[index] = item.copyWith(grams: g)),
+          ),
+      if (item.isFreeForm)
+        AppChip(
+          t('Save as a new food'),
+          icon: 'plus',
+          selected: false,
+          capitalize: false,
+          onTap: () => _saveAsFood(item),
+        ),
+    ];
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FoodThumb(food: item.food ?? foods.or(''), size: 42),
+          // A free-form item gets its category's glyph rather than the "Unknown food" one
+          // `foods.or('')` hands back: the app does not know this food, but the model did say
+          // what kind of thing it is, and a plate of rice should not be drawn as a question mark.
+          FoodThumb(
+            food: item.food ??
+                Food(
+                  id: '',
+                  n: item.name,
+                  cat: item.cat,
+                  kcal: 0,
+                  p: 0,
+                  c: 0,
+                  f: 0,
+                  missing: true,
+                ),
+            size: 42,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -360,25 +397,19 @@ class _MealPhotoSheetState extends ConsumerState<_MealPhotoSheet> {
                 if (_saidDifferently(item))
                   Text(t('seen as {0}', item.name),
                       style: ts(TypeScale.foot, color: c.label3)),
+                // Said plainly, because it is the honest state of things and the user is the only
+                // one who can fix it: these macros came from the model, not from a food record,
+                // and this row is the one place that difference is visible.
+                if (item.isFreeForm)
+                  Text(t('Not in your foods'), style: ts(TypeScale.foot, color: c.label3)),
                 Text('${macros.kcal.round()} ${t('kcal')}',
                     style: ts(TypeScale.foot, color: c.label2)),
                 // Three taps for the whole range. The cheapest honest expression of uncertainty:
                 // the spread is visible rather than hidden behind one number, and correcting it
                 // costs one tap. Same shape foodDetailSheet uses for household portions.
-                if (item.gramsLow < item.gramsHigh) ...[
+                if (chips.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  ChipRow(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      for (final g in {item.gramsLow, item.grams, item.gramsHigh})
-                        AppChip(
-                          '${g.round()} ${t('g')}',
-                          selected: (g - item.grams).abs() < 0.5,
-                          capitalize: false,
-                          onTap: () => setState(() => _items[index] = item.copyWith(grams: g)),
-                        ),
-                    ],
-                  ),
+                  ChipRow(padding: EdgeInsets.zero, children: chips),
                 ],
               ],
             ),
@@ -404,6 +435,38 @@ class _MealPhotoSheetState extends ConsumerState<_MealPhotoSheet> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Keep a food the catalogue does not have, and point this row at it.
+  ///
+  /// Optional on purpose. The item logs perfectly well as a one-off if the user never touches
+  /// this — the day's totals must never wait on somebody doing library admin — but a food they
+  /// eat often is worth having, and the model has just handed over everything the form needs.
+  ///
+  /// Saving goes through the ordinary [customFoodSheet], so a food born from a photograph is the
+  /// same kind of record as one typed by hand, and the user sees and can correct every number
+  /// before it is kept.
+  void _saveAsFood(DraftItem item) {
+    final per = item.per100;
+    customFoodSheet(
+      name: item.name,
+      cat: item.cat,
+      kcal: per?.kcal,
+      p: per?.p,
+      c: per?.c,
+      f: per?.f,
+      onSaved: (food) {
+        if (!mounted) return;
+        // Found again rather than remembered by index: the sheet was open while this list was
+        // still editable, and a row removed in the meantime must not take an unrelated one's
+        // place. A miss means the user deleted this row, and there is nothing left to update.
+        final at = _items.indexOf(item);
+        if (at < 0) return;
+        // From here the row behaves like any other catalogue hit: `toMealItem` reads the food,
+        // the stale per100 is ignored, and the macros come from the record the user just checked.
+        setState(() => _items[at] = item.copyWith(food: Food.fromCustom(food), name: food.n));
+      },
     );
   }
 
@@ -511,8 +574,11 @@ bool _saidDifferently(DraftItem item) {
   final food = item.food;
   if (food == null || item.name.isEmpty) return false;
   final said = item.name.toLowerCase();
-  final known = food.n.toLowerCase();
-  return !known.contains(said) && !said.contains(known);
+  // Both spellings of the catalogue name. `food.n` is English and the model was asked to answer
+  // in the app's language, so comparing against the English alone made every row of a Spanish or
+  // German profile "differ" — the subtitle fired constantly and stopped meaning anything.
+  bool same(String known) => known.contains(said) || said.contains(known);
+  return !same(food.n.toLowerCase()) && !same(t(food.n).toLowerCase());
 }
 
 /// A food chosen through the ordinary picker, as something the review list can hold.
@@ -541,6 +607,7 @@ DraftItem _fromPicked(MealItem item) {
 
 String _problemLine(DraftProblem p) => switch (p) {
       DraftProblem.unknownFid => t('Some foods were not in the catalogue.'),
+      DraftProblem.unsureMatch => t('A food was matched to something similar — check it.'),
       DraftProblem.gramsClamped => t('A portion looked implausible and was capped.'),
       DraftProblem.kcalRecomputed => t('Calories were recalculated from the macros.'),
       DraftProblem.noMacros => t('Something could not be identified and was left out.'),

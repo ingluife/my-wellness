@@ -730,6 +730,7 @@ export default {
   "Yogurt and honey": "蜂蜜酸奶",
 
   // — AI features and meal photos —
+  "A food was matched to something similar — check it.": "有一种食物被匹配到了相似的条目 — 请检查。",
   "A portion looked implausible and was capped.": "有一份分量看起来不合理，已被限制。",
   "AI features": "AI 功能",
   "AI providers": "AI 服务商",
@@ -750,6 +751,7 @@ export default {
   "No API key set up yet.": "尚未设置 API 密钥。",
   "No connection.": "无网络连接。",
   "No connection. Log it by hand — the numbers are the same.": "无网络连接。手动记录吧——数字是一样的。",
+  "Not in your foods": "不在你的食物中",
   "Nothing in that photo matched a food.": "照片中没有匹配到任何食物。",
   "Off unless you set it up, and it runs on your own provider account.": "未设置前保持关闭，且使用你自己的服务商账户运行。",
   "Only the largest items were kept.": "仅保留了分量最大的几项。",
@@ -763,6 +765,7 @@ export default {
   "Reading the photo": "正在读取照片",
   "Remove": "移除",
   "Replace": "替换",
+  "Save as a new food": "保存为新食物",
   "Set up meal photos": "设置餐食照片",
   "Some foods were not in the catalogue.": "有些食物不在目录中。",
   "Something could not be identified and was left out.": "有一项无法识别，已被略去。",

@@ -65,6 +65,117 @@ void main() {
     });
   });
 
+  /// The rule the Arepa incident bought.
+  ///
+  /// A photographed dish the catalogue did not have came back logged as a food the user had
+  /// registered by hand, because the prompt asked for the nearest entry and nothing downstream
+  /// could tell a match from a near-neighbour. The model now says which it meant, and these are
+  /// the tests that make it matter.
+  group('a match the model would not stand behind', () {
+    test('a near-neighbour id is thrown away, not logged under that food', () {
+      // The Arepa case, exactly: a real, resolvable catalogue id, disowned by the model itself.
+      final d = run(answer([
+        {
+          'fid': 'f0002',
+          'match': 'new',
+          'name': 'Arepa',
+          'cat': 'carb',
+          'grams': 100,
+          'per100': {'kcal': 220, 'p': 5, 'c': 45, 'f': 2},
+        }
+      ]));
+
+      final only = d.items.single;
+      expect(only.isFreeForm, isTrue, reason: 'the id must not survive');
+      expect(only.name, 'Arepa', reason: "the model's own name, not the catalogue's");
+      expect(only.toMealItem().fid, isNull);
+      // Its own macros, not rice's.
+      expect(only.toMealItem().kcal, 220);
+      expect(only.toMealItem().kcal, isNot(rice.kcal));
+    });
+
+    test('with nothing to fall back on the id is kept, and the user is told to look', () {
+      // Dropping it would under-count a day the user really ate. Keeping it silently would be the
+      // bug this group exists to prevent. Keeping it *and saying so* is the only honest option.
+      final d = run(answer([
+        {'fid': 'f0002', 'match': 'new', 'name': 'Arepa', 'grams': 100}
+      ]));
+
+      final only = d.items.single;
+      expect(only.isFreeForm, isFalse);
+      expect(only.food?.id, 'f0002');
+      expect(d.has(DraftProblem.unsureMatch), isTrue);
+    });
+
+    test('a match the model stands behind resolves exactly as before', () {
+      final d = run(answer([
+        {'fid': 'f0001', 'match': 'same', 'name': 'Chicken', 'grams': 200}
+      ]));
+
+      expect(d.items.single.food?.id, 'f0001');
+      expect(d.items.single.toMealItem().kcal, chicken.kcal * 2);
+      expect(d.has(DraftProblem.unsureMatch), isFalse);
+    });
+
+    test('no match field at all still resolves — an older provider loses nothing', () {
+      // Absent reads as "same" on purpose: a provider that drops the field must not have every
+      // catalogue hit in the answer quietly demoted to a free-form guess.
+      final d = run(answer([
+        {'fid': 'f0001', 'name': 'Chicken', 'grams': 200}
+      ]));
+
+      expect(d.items.single.food?.id, 'f0001');
+      expect(d.has(DraftProblem.unsureMatch), isFalse);
+    });
+
+    test('a demoted item raises no problem about numbers it never used', () {
+      // The catalogue macros are discarded, so a per100 that disagrees with its own kcal is the
+      // free-form food's business — but a *kept* match must not raise kcalRecomputed for a
+      // per100 nobody read.
+      final d = run(answer([
+        {
+          'fid': 'f0001',
+          'match': 'same',
+          'name': 'Chicken',
+          'grams': 100,
+          'per100': {'kcal': 800, 'p': 1, 'c': 1, 'f': 1},
+        }
+      ]));
+
+      expect(d.has(DraftProblem.kcalRecomputed), isFalse);
+    });
+  });
+
+  group('the category a new food would be saved under', () {
+    test('is carried through for the save form to start from', () {
+      final d = run(answer([
+        {
+          'match': 'new',
+          'name': 'Arepa',
+          'cat': 'carb',
+          'grams': 100,
+          'per100': {'kcal': 220, 'p': 5, 'c': 45, 'f': 2},
+        }
+      ]));
+      expect(d.items.single.cat, 'carb');
+    });
+
+    test('falls back rather than failing, because nothing is computed from it', () {
+      for (final junk in <Object?>[null, 'pudding', 42, '']) {
+        final d = run(answer([
+          {
+            'match': 'new',
+            'name': 'Arepa',
+            'cat': ?junk,
+            'grams': 100,
+            'per100': {'kcal': 220, 'p': 5, 'c': 45, 'f': 2},
+          }
+        ]));
+        expect(d.items.single.cat, 'other', reason: 'for $junk');
+      }
+    });
+  });
+
   group('catalogue hits', () {
     test('macros come from the food, never from the model', () {
       // The model is given every chance to be believed and must be ignored anyway.

@@ -56,6 +56,17 @@ class ImagePickerCapture implements PhotoCapture {
       maxWidth: 1024,
       maxHeight: 1024,
       imageQuality: 80,
+      // The back camera, always. Nobody photographs a plate with the selfie lens, and a front
+      // shot of a meal is a picture of a face by accident.
+      //
+      // This is also the plugin's default, and it is passed explicitly anyway: it is a decision,
+      // not an accident of the default, and a future reader changing these arguments should have
+      // to delete a line to lose it. What it does not do is guarantee anything on Android, where
+      // the shot is taken by whichever camera app answers the intent — the plugin documents that
+      // the preference is ignored when the lens is unsupported, and an app that reopens on its
+      // last-used lens can ignore it too. The next lever after this one is the `camera` package
+      // and an in-app capture screen, which is a much bigger thing than one argument.
+      preferredCameraDevice: CameraDevice.rear,
     );
     if (file == null) return null;
     return _processed(file);

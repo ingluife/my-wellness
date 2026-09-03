@@ -441,6 +441,87 @@ void main() {
     container.dispose();
   });
 
+  // ---------- a food the app does not have ----------
+
+  /// One answer, reused: a dish the catalogue does not carry, which the model declined to force
+  /// onto a near-neighbour. This is the shape the Arepa incident should have produced.
+  Object arepa() => answer([
+        {
+          'match': 'new',
+          'name': 'Arepa',
+          'cat': 'carb',
+          'grams': 100,
+          'per100': {'kcal': 220, 'p': 5, 'c': 45, 'f': 2},
+        }
+      ]);
+
+  testWidgets('a food the catalogue does not have says so, and offers to keep it', (tester) async {
+    final container = await pump(tester, result: AiDraft(arepa()));
+    await shoot(tester);
+
+    // Named as itself rather than as whatever it was nearest to.
+    expect(find.text('Arepa'), findsOneWidget);
+    expect(find.text('Not in your foods'), findsOneWidget);
+    expect(find.text('Save as a new food'), findsOneWidget);
+    // Still only a draft.
+    expect(container.read(appStateProvider).meals, isEmpty);
+    expect(container.read(appStateProvider).nutrition.foods, isEmpty);
+    container.dispose();
+  });
+
+  testWidgets('a catalogue food is not offered as something to save', (tester) async {
+    // The offer belongs to free-form items alone. On a resolved food it would invite a duplicate
+    // of a record the app already has.
+    await pump(tester, result: AiDraft(answer([
+      {'fid': chicken.id, 'name': 'Chicken', 'grams': 200},
+    ])));
+    await shoot(tester);
+
+    expect(find.text('Not in your foods'), findsNothing);
+    expect(find.text('Save as a new food'), findsNothing);
+  });
+
+  testWidgets('keeping it adds a real food, and the meal logs against it', (tester) async {
+    final container = await pump(tester, result: AiDraft(arepa()));
+    await shoot(tester);
+
+    await press(tester, find.text('Save as a new food'));
+
+    // The form arrives already filled in from what the model said — the user checks it, they do
+    // not retype it.
+    expect(find.text('Your own food'), findsOneWidget);
+    expect(find.widgetWithText(AppTextField, 'Arepa'), findsOneWidget);
+    await press(tester, find.text('Save food'));
+
+    final saved = container.read(appStateProvider).nutrition.foods.single;
+    expect(saved.n, 'Arepa');
+    expect(saved.cat, 'carb');
+    expect(saved.kcal, 220);
+
+    // And the row is now that food, so logging goes through the ordinary catalogue path.
+    await press(tester, find.text('Log this meal'));
+    final item = container.read(appStateProvider).meals.single.items.single;
+    expect(item.fid, saved.id);
+    expect(item.kcal, 220);
+    container.dispose();
+  });
+
+  testWidgets('not keeping it still logs the meal', (tester) async {
+    // The optional half of the deal, and the more important one: a day's totals must never wait
+    // on somebody doing library admin.
+    final container = await pump(tester, result: AiDraft(arepa()));
+    await shoot(tester);
+    await press(tester, find.text('Log this meal'));
+
+    final item = container.read(appStateProvider).meals.single.items.single;
+    expect(item.fid, isNull);
+    expect(item.n, 'Arepa');
+    expect(item.kcal, 220);
+    // Logged, but not quietly added to the library.
+    expect(container.read(appStateProvider).nutrition.foods, isEmpty);
+    container.dispose();
+  });
+
   // ---------- keeping the photograph ----------
 
   testWidgets('confirming stores the photo and hangs it on the meal', (tester) async {

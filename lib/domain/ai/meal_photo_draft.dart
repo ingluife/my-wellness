@@ -40,6 +40,10 @@ enum DraftProblem {
 
   /// A free-form item with no usable macros at all; dropped rather than logged as zero.
   noMacros,
+
+  /// The model reached for a catalogue id it would not call the same food, and gave nothing to
+  /// replace it with. The id is kept — the food was still eaten — but the user is told to look.
+  unsureMatch,
 }
 
 /// One food in a draft.
@@ -51,6 +55,7 @@ class DraftItem {
     required this.gramsHigh,
     this.food,
     this.per100,
+    this.cat = 'other',
     this.note,
   });
 
@@ -82,6 +87,13 @@ class DraftItem {
   /// Macros per 100 g. Set only when [food] is null — there is no other source then.
   final Per100? per100;
 
+  /// Which shelf of the library this would go on, if the user saves it as one of their own foods.
+  ///
+  /// Only ever read for a free-form item, and only to prefill a form the user can change. It is
+  /// not used in any calculation, which is why an unrecognised category can safely fall back to
+  /// 'other' rather than taking the item down with it.
+  final String cat;
+
   /// Anything the model wanted to say about this item, e.g. what it used for scale.
   final String? note;
 
@@ -108,6 +120,9 @@ class DraftItem {
     );
   }
 
+  /// Note [food] winning over [per100] in [toMealItem]: handing this a `food` is exactly how the
+  /// review sheet turns a free-form item into a saved one, and the now-stale `per100` riding along
+  /// is harmless because nothing reads it once a food is set.
   DraftItem copyWith({double? grams, Food? food, String? name, Per100? per100}) => DraftItem(
         name: name ?? this.name,
         grams: grams ?? this.grams,
@@ -115,6 +130,7 @@ class DraftItem {
         gramsHigh: gramsHigh,
         food: food ?? this.food,
         per100: per100 ?? this.per100,
+        cat: cat,
         note: note,
       );
 }

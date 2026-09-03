@@ -1536,14 +1536,63 @@ List<Food> recentFoods(AppState s, {int take = 8}) {
 }
 
 /// A food the catalogue does not carry.
-Future<void> customFoodSheet({String? iso, double? slot}) =>
-    showSheet<void>((context, close) => _CustomFoodSheet(iso: iso, slot: slot, close: close));
+///
+/// Opened empty from the food library, and prefilled from the photo sheet, where the model has
+/// just described a food the catalogue does not have and the figures are already on screen. The
+/// prefill arrives as loose numbers rather than as the photo feature's `Per100` record on
+/// purpose: this sheet is the app's ordinary way of adding a food, and it should not have to know
+/// that an AI feature exists to be handed a starting point.
+///
+/// [onSaved] replaces the jump to `foodDetailSheet` — a caller that has its own idea of what
+/// happens next (the photo review, which wants the new food back in the row it came from) says so
+/// by passing one.
+Future<void> customFoodSheet({
+  String? iso,
+  double? slot,
+  String? name,
+  String? cat,
+  double? kcal,
+  double? p,
+  double? c,
+  double? f,
+  void Function(CustomFood)? onSaved,
+}) =>
+    showSheet<void>((context, close) => _CustomFoodSheet(
+          iso: iso,
+          slot: slot,
+          close: close,
+          name: name,
+          cat: cat,
+          kcal: kcal,
+          p: p,
+          c: c,
+          f: f,
+          onSaved: onSaved,
+        ));
 
 class _CustomFoodSheet extends ConsumerStatefulWidget {
-  const _CustomFoodSheet({required this.close, this.iso, this.slot});
+  const _CustomFoodSheet({
+    required this.close,
+    this.iso,
+    this.slot,
+    this.name,
+    this.cat,
+    this.kcal,
+    this.p,
+    this.c,
+    this.f,
+    this.onSaved,
+  });
 
   final String? iso;
   final double? slot;
+  final String? name;
+  final String? cat;
+  final double? kcal;
+  final double? p;
+  final double? c;
+  final double? f;
+  final void Function(CustomFood)? onSaved;
   final void Function([void]) close;
 
   @override
@@ -1557,6 +1606,21 @@ class _CustomFoodSheetState extends ConsumerState<_CustomFoodSheet> {
   double? _p;
   double? _c;
   double? _f;
+
+  @override
+  void initState() {
+    super.initState();
+    // Every field stays editable. A prefill is a starting point the user can overwrite, which is
+    // the whole reason the photo sheet sends them here instead of saving a food behind their back.
+    _name.text = widget.name ?? '';
+    // Only a category the app actually has; anything else keeps the default rather than putting
+    // a value in the picker that none of its options match.
+    if (widget.cat != null && foodCategories.contains(widget.cat)) _cat = widget.cat!;
+    _kcal = widget.kcal;
+    _p = widget.p;
+    _c = widget.c;
+    _f = widget.f;
+  }
 
   @override
   void dispose() {
@@ -1633,6 +1697,12 @@ class _CustomFoodSheetState extends ConsumerState<_CustomFoodSheet> {
             ref.read(appStateProvider.notifier)
                 .update((st) => st.nutrition.foods.add(food.copy()));
             widget.close();
+            final saved = widget.onSaved;
+            if (saved != null) {
+              // The caller is mid-flow and wants the food, not a portion form on top of it.
+              saved(food);
+              return;
+            }
             // Straight on to the portion, because adding a food is almost never the actual
             // goal — logging what you just ate is.
             if (widget.iso != null) {

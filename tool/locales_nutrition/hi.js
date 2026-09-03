@@ -730,6 +730,7 @@ export default {
   "Yogurt and honey": "दही और शहद",
 
   // — AI features and meal photos —
+  "A food was matched to something similar — check it.": "एक खाद्य पदार्थ मिलती-जुलती चीज़ से मिलाया गया — इसे जाँचें।",
   "A portion looked implausible and was capped.": "एक हिस्से की मात्रा असंभव लगी और उसे सीमित कर दिया गया।",
   "AI features": "AI सुविधाएँ",
   "AI providers": "AI प्रदाता",
@@ -750,6 +751,7 @@ export default {
   "No API key set up yet.": "अभी तक कोई API कुंजी सेट नहीं है।",
   "No connection.": "कोई कनेक्शन नहीं।",
   "No connection. Log it by hand — the numbers are the same.": "कोई कनेक्शन नहीं। हाथ से दर्ज करें — संख्याएँ वही हैं।",
+  "Not in your foods": "आपके खाद्य पदार्थों में नहीं",
   "Nothing in that photo matched a food.": "उस फ़ोटो में कोई भी चीज़ किसी भोजन से मेल नहीं खाई।",
   "Off unless you set it up, and it runs on your own provider account.": "जब तक आप इसे सेट न करें यह बंद रहता है, और यह आपके अपने प्रदाता खाते पर चलता है।",
   "Only the largest items were kept.": "केवल सबसे बड़ी चीज़ें रखी गईं।",
@@ -763,6 +765,7 @@ export default {
   "Reading the photo": "फ़ोटो पढ़ी जा रही है",
   "Remove": "हटाएँ",
   "Replace": "बदलें",
+  "Save as a new food": "नए खाद्य पदार्थ के रूप में सहेजें",
   "Set up meal photos": "भोजन की फ़ोटो सेट करें",
   "Some foods were not in the catalogue.": "कुछ खाद्य पदार्थ सूची में नहीं थे।",
   "Something could not be identified and was left out.": "कुछ पहचाना नहीं जा सका और उसे छोड़ दिया गया।",

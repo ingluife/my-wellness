@@ -730,6 +730,7 @@ export default {
   "Yogurt and honey": "요거트와 꿀",
 
   // — AI features and meal photos —
+  "A food was matched to something similar — check it.": "어떤 음식이 비슷한 항목으로 인식되었습니다 — 확인해 보세요.",
   "A portion looked implausible and was capped.": "한 항목의 분량이 비현실적이어서 상한을 적용했습니다.",
   "AI features": "AI 기능",
   "AI providers": "AI 제공자",
@@ -750,6 +751,7 @@ export default {
   "No API key set up yet.": "아직 설정된 API 키가 없습니다.",
   "No connection.": "연결이 없습니다.",
   "No connection. Log it by hand — the numbers are the same.": "연결이 없습니다. 직접 입력하세요 — 숫자는 같습니다.",
+  "Not in your foods": "내 음식 목록에 없음",
   "Nothing in that photo matched a food.": "사진에서 일치하는 음식을 찾지 못했습니다.",
   "Off unless you set it up, and it runs on your own provider account.": "설정하기 전까지는 꺼져 있으며, 본인의 제공자 계정으로 동작합니다.",
   "Only the largest items were kept.": "가장 양이 많은 항목만 남겼습니다.",
@@ -763,6 +765,7 @@ export default {
   "Reading the photo": "사진을 읽는 중",
   "Remove": "삭제",
   "Replace": "교체",
+  "Save as a new food": "새 음식으로 저장",
   "Set up meal photos": "식사 사진 설정",
   "Some foods were not in the catalogue.": "일부 음식은 목록에 없었습니다.",
   "Something could not be identified and was left out.": "식별하지 못한 항목이 있어 제외했습니다.",

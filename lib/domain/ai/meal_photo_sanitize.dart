@@ -12,6 +12,12 @@ import 'meal_photo_draft.dart';
 /// from USDA either way. Everything else here is guarding the remaining case — a food the
 /// catalogue does not have — where there is no second source and the numbers have to be checked
 /// against themselves instead.
+///
+/// And a second rule, learned the hard way: **a catalogue id the model would not call the same
+/// food is not a match.** An unrecognised dish once came back logged as a food the user had
+/// registered by hand, because the prompt asked for the nearest catalogue entry and this file had
+/// no way to tell a match from a near-neighbour. The prompt now asks the model to say which it
+/// meant, and [_saysNotSame] is where that answer is acted on rather than trusted to prose.
 
 typedef FoodLookup = Food? Function(String id);
 
@@ -103,8 +109,28 @@ DraftItem? _item(Map<String, dynamic> e, FoodLookup lookup, Set<DraftProblem> pr
   //    placeholder — `foods.or(id)` returns a food whose macros are all zero, and logging that
   //    would put a silent 0 kcal row in the day. This is the most load-bearing line in the file.
   final fid = e['fid'] is String ? (e['fid'] as String).trim() : '';
-  final food = fid.isEmpty ? null : lookup(fid);
+  var food = fid.isEmpty ? null : lookup(fid);
   if (fid.isNotEmpty && food == null) problems.add(DraftProblem.unknownFid);
+
+  // 4b. The model's own verdict on its id. Parsed only when it could change something: when the
+  //     id already resolved and was called the same food, the model was told not to send macros
+  //     at all, and reading them here would let a stray `per100` raise problems for numbers this
+  //     item is never going to use.
+  final demote = food != null && _saysNotSame(e['match']);
+  final own = (food == null || demote) ? _per100(e['per100'], problems) : null;
+
+  if (demote) {
+    if (own != null) {
+      // The id goes, and with it the catalogue's macros and its name. What is left is what the
+      // model actually saw: a food this app does not have yet, which the review sheet offers to
+      // save. This is the line that stops an arepa being logged as a tortilla.
+      food = null;
+    } else {
+      // Nothing to fall back to. Dropping the item would under-count a day the user really ate,
+      // so the id stays and the sheet says out loud that it needs a look.
+      problems.add(DraftProblem.unsureMatch);
+    }
+  }
 
   if (food == null && name.isEmpty) return null;
 
@@ -132,7 +158,7 @@ DraftItem? _item(Map<String, dynamic> e, FoodLookup lookup, Set<DraftProblem> pr
 
   Per100? per100;
   if (food == null) {
-    per100 = _per100(e['per100'], problems);
+    per100 = own;
     // 9. A free-form food with nothing behind it contributes zero and would silently under-count
     //    the day — the exact failure the log's own reasoning warns about, where an unlogged day
     //    reads as a day nobody ate. Drop it and let the sheet offer to add it by hand.
@@ -149,9 +175,23 @@ DraftItem? _item(Map<String, dynamic> e, FoodLookup lookup, Set<DraftProblem> pr
     gramsHigh: high,
     food: food,
     per100: per100,
+    cat: _cat(e['cat']),
     note: e['note'] is String ? e['note'] as String : null,
   );
 }
+
+/// Whether the model disowned its own id.
+///
+/// Absent reads as "same", deliberately: a provider that drops the field — an older adapter, a
+/// model answering without constrained decoding — must not have every catalogue match in the
+/// answer quietly demoted to a free-form guess. Anything the model *does* say that is not 'same'
+/// is taken at its word.
+bool _saysNotSame(Object? raw) => raw is String && raw != 'same';
+
+/// The category to prefill a saved food with. Never load-bearing, so anything unrecognised falls
+/// back rather than failing.
+String _cat(Object? raw) =>
+    raw is String && foodCategories.contains(raw) ? raw : 'other';
 
 /// Per-100 g macros for a free-form food, clamped and cross-checked, or null when there is
 /// nothing usable.
@@ -201,6 +241,7 @@ List<DraftItem> _merge(List<DraftItem> items) {
       gramsHigh: prev.gramsHigh + i.gramsHigh,
       food: prev.food,
       per100: prev.per100,
+      cat: prev.cat,
       note: prev.note,
     );
   }

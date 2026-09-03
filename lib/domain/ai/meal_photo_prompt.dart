@@ -62,12 +62,18 @@ String buildCustomFoods(List<CustomFood> foods, {int cap = 60}) {
 const mealPhotoInstructions = '''
 You identify the food in a photograph of a meal and estimate how much of each is there.
 
-Return one entry per distinguishable food, using this catalogue where you can:
+Return one entry per distinguishable food, using this catalogue where it genuinely applies:
 
-- Set "fid" to a catalogue id whenever something in the catalogue is a reasonable match for what
-  you see. Prefer a close catalogue match over inventing an entry.
-- Only when nothing in the catalogue is close, leave "fid" empty and give "per100" instead —
-  macros per 100 g for that food. Never give "per100" alongside an "fid".
+- Set "fid" to a catalogue id only when that entry is the *same food* as what you see. A different
+  preparation of the same ingredient is the same food — grilled, boiled and roast chicken are all
+  chicken. A dish that merely resembles a catalogue entry, or is made of it, is not: a filled
+  pastry is not flour, and an arepa is not a tortilla.
+- When nothing in the catalogue is that food, leave "fid" empty and give "per100" — macros per
+  100 g — together with "cat", the category it belongs in. A food the catalogue does not have is a
+  normal answer, not a failure, and naming it as itself is far more useful than forcing it onto a
+  near-neighbour. Never give "per100" alongside an "fid".
+- Set "match" on every entry: "same" when the "fid" is genuinely that food, "new" when there is no
+  "fid". If you would have to explain the difference to the person eating it, it is "new".
 - Always set "name" to what you would call the food, even when you set an "fid". If the two
   disagree the reviewer needs to see both.
 
@@ -111,10 +117,23 @@ const mealPhotoSchema = <String, dynamic>{
       'items': {
         'type': 'object',
         'additionalProperties': false,
-        'required': ['name', 'grams'],
+        'required': ['name', 'grams', 'match'],
         'properties': {
           'fid': {'type': 'string'},
+          // Whether the "fid" is the same food or only a near neighbour. Required, so a provider
+          // doing constrained decoding always answers it rather than leaving the sanitizer to
+          // guess — and `meal_photo_sanitize.dart` throws the id away for anything but 'same'.
+          'match': {
+            'type': 'string',
+            'enum': ['same', 'new'],
+          },
           'name': {'type': 'string'},
+          // Only meaningful for a 'new' food: it prefills the category on the "save this as one of
+          // your foods" form. The enum is the app's own list, not a copy of it.
+          'cat': {
+            'type': 'string',
+            'enum': foodCategories,
+          },
           'grams': {'type': 'number'},
           'gramsLow': {'type': 'number'},
           'gramsHigh': {'type': 'number'},
@@ -150,7 +169,8 @@ String buildRequestTail({
   if (customFoods.isNotEmpty) {
     b
       ..writeln()
-      ..writeln("This person's own foods — prefer these ids when they match:")
+      ..writeln("This person's own foods — use one of these ids only when the photo shows that "
+          'same food:')
       ..writeln(customFoods);
   }
   if (hint != null && hint.trim().isNotEmpty) {
