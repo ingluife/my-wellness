@@ -5,21 +5,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:my_open_gym/data/ai/ai_key_store.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/data/repositories/meal_photo_store.dart';
-import 'package:my_open_gym/domain/ai/ai_provider.dart';
-import 'package:my_open_gym/domain/exercises.dart';
-import 'package:my_open_gym/domain/foods.dart';
-import 'package:my_open_gym/domain/format.dart';
-import 'package:my_open_gym/domain/i18n.dart';
-import 'package:my_open_gym/state/ai_provider.dart';
-import 'package:my_open_gym/state/app_state_provider.dart';
-import 'package:my_open_gym/ui/app.dart';
-import 'package:my_open_gym/ui/sheets/sheet_service.dart';
-import 'package:my_open_gym/ui/widgets/controls/fields.dart';
-import 'package:my_open_gym/ui/widgets/controls/surfaces.dart';
-import 'package:my_open_gym/ui/widgets/controls/toggles.dart';
+import 'package:my_wellness/data/ai/ai_key_store.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/data/repositories/meal_photo_store.dart';
+import 'package:my_wellness/domain/ai/ai_provider.dart';
+import 'package:my_wellness/domain/exercises.dart';
+import 'package:my_wellness/domain/foods.dart';
+import 'package:my_wellness/domain/format.dart';
+import 'package:my_wellness/domain/i18n.dart';
+import 'package:my_wellness/state/ai_provider.dart';
+import 'package:my_wellness/state/app_state_provider.dart';
+import 'package:my_wellness/ui/app.dart';
+import 'package:my_wellness/ui/sheets/sheet_service.dart';
+import 'package:my_wellness/ui/widgets/controls/fields.dart';
+import 'package:my_wellness/ui/widgets/controls/surfaces.dart';
+import 'package:my_wellness/ui/widgets/controls/toggles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// The AI settings screen, and the one property that matters more than any of its behaviour:
@@ -81,7 +81,7 @@ void main() {
     );
     if (initial != null) container.read(appStateProvider.notifier).replaceState(initial);
     await tester.pumpWidget(
-        UncontrolledProviderScope(container: container, child: const MyOpenGymApp()));
+        UncontrolledProviderScope(container: container, child: const MyWellnessApp()));
     await tester.pumpAndSettle();
     appNavigatorKey.currentContext!.go('/settings/ai');
     await tester.pumpAndSettle();
@@ -597,7 +597,7 @@ void main() {
     );
     container.read(appStateProvider.notifier).replaceState(initial);
     await tester.pumpWidget(
-        UncontrolledProviderScope(container: container, child: const MyOpenGymApp()));
+        UncontrolledProviderScope(container: container, child: const MyWellnessApp()));
     await tester.pumpAndSettle();
     appNavigatorKey.currentContext!.go('/settings');
     await tester.pumpAndSettle();

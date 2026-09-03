@@ -1,4 +1,4 @@
-# myOpenGym
+# My Wellness
 
 A Flutter translation of [openGym](https://github.com/DuarteSantos8/openGym) — the same gym and
 body-weight tracker, rebuilt as a native Android and iOS app so it can grow with Firebase behind
@@ -148,7 +148,7 @@ lib/
   population, a MET table inferred from a body part, and a portion size somebody eyeballed. Stats
   compares what the log *predicted* against what the scale actually did and reports the gap,
   because the only number that generalises to one person is whether these estimates run high or
-  low for them. `nutrition`, `meals` and `ai` are the three keys myOpenGym adds that openGym has
+  low for them. `nutrition`, `meals` and `ai` are the three keys My Wellness adds that openGym has
   no default for, and all three stay absent from a backup until the feature is used. `ai` holds
   which provider answers which feature and never a credential — keys live in the phone keychain,
   because the state is mirrored to a plaintext file and copied into every backup.

@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:my_open_gym/domain/format.dart';
+import 'package:my_wellness/domain/format.dart';
 
 void main() {
   setUpAll(() async => initializeDateFormatting());

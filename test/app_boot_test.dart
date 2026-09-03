@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/domain/exercises.dart';
-import 'package:my_open_gym/state/app_state_provider.dart';
-import 'package:my_open_gym/ui/app.dart';
-import 'package:my_open_gym/ui/sheets/sheet_service.dart';
-import 'package:my_open_gym/ui/widgets/tab_bar.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/domain/exercises.dart';
+import 'package:my_wellness/state/app_state_provider.dart';
+import 'package:my_wellness/ui/app.dart';
+import 'package:my_wellness/ui/sheets/sheet_service.dart';
+import 'package:my_wellness/ui/widgets/tab_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -21,7 +21,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('the app boots into Home with the tab bar available', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: MyOpenGymApp()));
+    await tester.pumpWidget(const ProviderScope(child: MyWellnessApp()));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -40,7 +40,7 @@ void main() {
         );
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const MyOpenGymApp()),
+      UncontrolledProviderScope(container: container, child: const MyWellnessApp()),
     );
     await tester.pumpAndSettle();
 
@@ -67,7 +67,7 @@ void main() {
     // The bug this pins: the disc used to be lifted out of the bar's row with a Transform, and
     // the ClipRect that bounds the bar's BackdropFilter sheared the top third of it off — a
     // green half-circle sitting flat against the bar's top edge.
-    await tester.pumpWidget(const ProviderScope(child: MyOpenGymApp()));
+    await tester.pumpWidget(const ProviderScope(child: MyWellnessApp()));
     await tester.pumpAndSettle();
 
     final bar = tester.getRect(find.byType(AppTabBar));
@@ -94,7 +94,7 @@ void main() {
     // The half of the old bug a screenshot could not show. Hit testing is bounded by the box a
     // widget was laid out in, so the part of the disc that hung outside the bar was dead to touch
     // as well as invisible — and that dead strip was the part nearest the thumb.
-    await tester.pumpWidget(const ProviderScope(child: MyOpenGymApp()));
+    await tester.pumpWidget(const ProviderScope(child: MyWellnessApp()));
     await tester.pumpAndSettle();
 
     await tester.tapAt(tester.getRect(disc).topCenter + const Offset(0, 2));
@@ -114,7 +114,7 @@ void main() {
         );
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const MyOpenGymApp()),
+      UncontrolledProviderScope(container: container, child: const MyWellnessApp()),
     );
     await tester.pump();
 

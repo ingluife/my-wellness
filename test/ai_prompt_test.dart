@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/domain/ai/meal_photo_prompt.dart';
-import 'package:my_open_gym/domain/foods.dart';
-import 'package:my_open_gym/domain/i18n.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/domain/ai/meal_photo_prompt.dart';
+import 'package:my_wellness/domain/foods.dart';
+import 'package:my_wellness/domain/i18n.dart';
 
 /// The vocabulary block is the cached prefix of every meal-photo request.
 ///

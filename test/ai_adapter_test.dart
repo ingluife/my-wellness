@@ -5,10 +5,10 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:my_open_gym/data/ai/ai_key_store.dart';
-import 'package:my_open_gym/data/ai/anthropic_adapter.dart';
-import 'package:my_open_gym/domain/ai/ai_provider.dart';
-import 'package:my_open_gym/domain/ai/meal_photo_prompt.dart';
+import 'package:my_wellness/data/ai/ai_key_store.dart';
+import 'package:my_wellness/data/ai/anthropic_adapter.dart';
+import 'package:my_wellness/domain/ai/ai_provider.dart';
+import 'package:my_wellness/domain/ai/meal_photo_prompt.dart';
 
 /// The wire format, and the handling of everything that can come back down it.
 ///

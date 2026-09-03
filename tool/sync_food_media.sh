@@ -25,7 +25,7 @@ command -v curl >/dev/null || { echo "curl is required" >&2; exit 1; }
 # Wikimedia refuses a default curl User-Agent with 429 and asks for something identifiable;
 # most of the image hosts here are Commons, so this is the difference between a working sync
 # and two hundred rate-limit failures.
-UA="myOpenGym-media-sync/1.0 (+https://github.com/DuarteSantos8/openGym) curl"
+UA="MyWellness-media-sync/1.0 (+https://github.com/DuarteSantos8/openGym) curl"
 
 RESIZE=""
 if command -v magick >/dev/null; then RESIZE="magick"

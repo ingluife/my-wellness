@@ -18,7 +18,7 @@ plugins {
 }
 
 android {
-    namespace = "ch.duartesantos.myopengym"
+    namespace = "com.mywellness.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -35,9 +35,8 @@ android {
     }
 
     defaultConfig {
-        // Distinct from openGym's ch.duartesantos.opengym, so both can be installed side by
-        // side while this one is being brought up.
-        applicationId = "ch.duartesantos.myopengym"
+        // Its own namespace, distinct from openGym's, so both can be installed side by side.
+        applicationId = "com.mywellness.app"
         // flutter_local_notifications and wakelock_plus both want 23+; the exercise library
         // and the animations do not care.
         minSdk = flutter.minSdkVersion

@@ -1,13 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/domain/exercises.dart';
-import 'package:my_open_gym/domain/format.dart';
-import 'package:my_open_gym/state/app_state_provider.dart';
-import 'package:my_open_gym/ui/app.dart';
-import 'package:my_open_gym/ui/widgets/controls/surfaces.dart';
-import 'package:my_open_gym/ui/widgets/line_chart.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/domain/exercises.dart';
+import 'package:my_wellness/domain/format.dart';
+import 'package:my_wellness/state/app_state_provider.dart';
+import 'package:my_wellness/ui/app.dart';
+import 'package:my_wellness/ui/widgets/controls/surfaces.dart';
+import 'package:my_wellness/ui/widgets/line_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -26,7 +26,7 @@ void main() {
     final container = ProviderContainer();
     if (initial != null) container.read(appStateProvider.notifier).replaceState(initial);
     await tester.pumpWidget(
-        UncontrolledProviderScope(container: container, child: const MyOpenGymApp()));
+        UncontrolledProviderScope(container: container, child: const MyWellnessApp()));
     if (settle) {
       await tester.pumpAndSettle();
     } else {

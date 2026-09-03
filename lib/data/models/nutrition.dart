@@ -4,7 +4,7 @@ import 'json.dart';
 /// meals logged against it.
 ///
 /// None of this exists in openGym. Its store carries no body metrics beyond weight and no food
-/// log at all, so `nutrition` and `meals` are keys myOpenGym adds. openGym loads its state with
+/// log at all, so `nutrition` and `meals` are keys My Wellness adds. openGym loads its state with
 /// `Object.assign(clone(DEF), JSON.parse(raw))` and persists the whole object, so both survive a
 /// round trip through it untouched — they simply do not render there. That is only true while
 /// this build keeps writing them *absently* until the feature is used; see AppState.toJson.

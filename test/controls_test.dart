@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/ui/theme/app_theme.dart';
-import 'package:my_open_gym/ui/theme/tokens.dart';
-import 'package:my_open_gym/ui/widgets/app_icon.dart';
-import 'package:my_open_gym/ui/widgets/controls/app_button.dart';
-import 'package:my_open_gym/ui/widgets/controls/fields.dart';
-import 'package:my_open_gym/ui/widgets/controls/slider.dart';
-import 'package:my_open_gym/ui/widgets/controls/stepper.dart';
-import 'package:my_open_gym/ui/widgets/controls/surfaces.dart';
-import 'package:my_open_gym/ui/widgets/controls/toggles.dart';
+import 'package:my_wellness/ui/theme/app_theme.dart';
+import 'package:my_wellness/ui/theme/tokens.dart';
+import 'package:my_wellness/ui/widgets/app_icon.dart';
+import 'package:my_wellness/ui/widgets/controls/app_button.dart';
+import 'package:my_wellness/ui/widgets/controls/fields.dart';
+import 'package:my_wellness/ui/widgets/controls/slider.dart';
+import 'package:my_wellness/ui/widgets/controls/stepper.dart';
+import 'package:my_wellness/ui/widgets/controls/surfaces.dart';
+import 'package:my_wellness/ui/widgets/controls/toggles.dart';
 
 /// Every control, in both themes and all eight accents, must build and paint. This is the
 /// headless equivalent of the design gallery the plan called for.

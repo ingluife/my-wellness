@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:my_open_gym/domain/exercises.dart';
-import 'package:my_open_gym/ui/screens/library_screen.dart';
-import 'package:my_open_gym/ui/theme/app_theme.dart';
-import 'package:my_open_gym/ui/theme/tokens.dart';
-import 'package:my_open_gym/ui/widgets/controls/fields.dart';
-import 'package:my_open_gym/ui/widgets/controls/surfaces.dart';
+import 'package:my_wellness/domain/exercises.dart';
+import 'package:my_wellness/ui/screens/library_screen.dart';
+import 'package:my_wellness/ui/theme/app_theme.dart';
+import 'package:my_wellness/ui/theme/tokens.dart';
+import 'package:my_wellness/ui/widgets/controls/fields.dart';
+import 'package:my_wellness/ui/widgets/controls/surfaces.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

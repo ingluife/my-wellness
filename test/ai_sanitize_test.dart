@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/domain/ai/meal_photo_draft.dart';
-import 'package:my_open_gym/domain/ai/meal_photo_sanitize.dart';
-import 'package:my_open_gym/domain/foods.dart';
+import 'package:my_wellness/domain/ai/meal_photo_draft.dart';
+import 'package:my_wellness/domain/ai/meal_photo_sanitize.dart';
+import 'package:my_wellness/domain/foods.dart';
 
 /// The gate between what a model said and what the app is willing to put in a food log.
 ///

@@ -35,14 +35,14 @@ final uiProvider = Provider<UiController>((ref) {
 /// Theme and language are read straight out of the profile, so switching either repaints
 /// everything without a restart — the same thing the original does by re-rendering the whole
 /// shell when `data-theme`, `data-accent` or the language pack changes.
-class MyOpenGymApp extends ConsumerStatefulWidget {
-  const MyOpenGymApp({super.key});
+class MyWellnessApp extends ConsumerStatefulWidget {
+  const MyWellnessApp({super.key});
 
   @override
-  ConsumerState<MyOpenGymApp> createState() => _MyOpenGymAppState();
+  ConsumerState<MyWellnessApp> createState() => _MyWellnessAppState();
 }
 
-class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBindingObserver {
+class _MyWellnessAppState extends ConsumerState<MyWellnessApp> with WidgetsBindingObserver {
   late final GoRouter _router = buildRouter();
 
   @override

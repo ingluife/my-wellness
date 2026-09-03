@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/domain/ai/plan_prompt.dart';
-import 'package:my_open_gym/domain/ai/plan_scope.dart';
-import 'package:my_open_gym/domain/exercises.dart';
+import 'package:my_wellness/domain/ai/plan_prompt.dart';
+import 'package:my_wellness/domain/ai/plan_scope.dart';
+import 'package:my_wellness/domain/exercises.dart';
 
 import 'helpers.dart';
 

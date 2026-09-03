@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/domain/onerm.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/domain/onerm.dart';
 
 
 /// Ported from openGym/frontend/src/lib/onerm.test.js.

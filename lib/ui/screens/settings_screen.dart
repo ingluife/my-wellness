@@ -133,7 +133,7 @@ class SettingsScreen extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.only(top: 4, bottom: 20),
           child: Text(
-            'myOpenGym · ${t('free & open source (AGPL v3)')}\n'
+            'My Wellness · ${t('free & open source (AGPL v3)')}\n'
             'a Flutter translation of openGym · exercise data: hasaneyldrm/exercises-dataset (CC)',
             textAlign: TextAlign.center,
             style: ts(TypeScale.foot, color: c.label3),

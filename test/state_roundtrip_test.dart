@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/data/ai/ai_key_store.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
+import 'package:my_wellness/data/ai/ai_key_store.dart';
+import 'package:my_wellness/data/models/app_state.dart';
 
 /// The single most important test in the project.
 ///
-/// myOpenGym and openGym have to read each other's backups, which means the Dart models must
+/// My Wellness and openGym have to read each other's backups, which means the Dart models must
 /// serialise the *same* JSON the JavaScript ones do — same keys, same absences, same number
 /// forms. Anything less makes this a lookalike rather than a translation.
 void main() {

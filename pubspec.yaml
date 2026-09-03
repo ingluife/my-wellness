@@ -1,5 +1,5 @@
-name: my_open_gym
-description: "openGym, rebuilt in Flutter — a personal gym & body-weight tracker."
+name: my_wellness
+description: "My Wellness, a Flutter translation of openGym — a personal gym & body-weight tracker."
 publish_to: 'none'
 
 # Kept in step with the openGym release this was translated from (frontend/package.json 1.2.4).

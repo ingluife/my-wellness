@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/domain/muscles.dart';
-import 'package:my_open_gym/ui/theme/app_theme.dart';
-import 'package:my_open_gym/ui/theme/tokens.dart';
-import 'package:my_open_gym/ui/widgets/body_map.dart';
+import 'package:my_wellness/domain/muscles.dart';
+import 'package:my_wellness/ui/theme/app_theme.dart';
+import 'package:my_wellness/ui/theme/tokens.dart';
+import 'package:my_wellness/ui/widgets/body_map.dart';
 
 void main() {
   setUpAll(() => TestWidgetsFlutterBinding.ensureInitialized());

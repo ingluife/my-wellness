@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/domain/i18n.dart';
+import 'package:my_wellness/domain/i18n.dart';
 
 /// Guards the shipped language packs.
 ///

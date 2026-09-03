@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/domain/history.dart';
-import 'package:my_open_gym/domain/plan_share.dart';
-import 'package:my_open_gym/domain/starter.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/domain/history.dart';
+import 'package:my_wellness/domain/plan_share.dart';
+import 'package:my_wellness/domain/starter.dart';
 
 import 'helpers.dart';
 

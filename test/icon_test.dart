@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/ui/widgets/app_icon.dart';
+import 'package:my_wellness/ui/widgets/app_icon.dart';
 
 void main() {
   test('every icon key parses into paintable geometry', () {

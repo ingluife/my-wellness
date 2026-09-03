@@ -1,7 +1,7 @@
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/state/sound.dart';
-import 'package:my_open_gym/state/ui_provider.dart';
+import 'package:my_wellness/state/sound.dart';
+import 'package:my_wellness/state/ui_provider.dart';
 
 /// A sound service that records what it was asked to play instead of touching an audio route.
 class _FakeSound implements Sound {

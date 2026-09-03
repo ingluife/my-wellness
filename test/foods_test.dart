@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/domain/foods.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/domain/foods.dart';
 
 /// Guards the generated catalogue.
 ///

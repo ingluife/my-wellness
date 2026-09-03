@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/data/repositories/state_repository.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/data/repositories/state_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

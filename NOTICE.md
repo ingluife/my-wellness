@@ -1,6 +1,6 @@
 # Third-party notices
 
-myOpenGym is a Flutter translation of [openGym](https://github.com/DuarteSantos8/openGym) and,
+My Wellness is a Flutter translation of [openGym](https://github.com/DuarteSantos8/openGym) and,
 like it, is licensed under the **GNU AGPL v3.0**.
 
 openGym's own third-party notices apply here too and are reproduced in shortened form below;
@@ -21,7 +21,7 @@ The exercise names, instructions and animations (`assets/data/exercises.json`, `
 [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) and are **not**
 covered by this project's AGPL licence — they remain under that dataset's own terms. The media
 files are not distributed in this repository; they are fetched by `tool/sync_media.sh`. If you
-redistribute myOpenGym with the media included, review the upstream licence first.
+redistribute My Wellness with the media included, review the upstream licence first.
 
 ## Food data
 
@@ -63,5 +63,5 @@ catalogue reads as one grid. For the share-alike images, that crop is a derivati
 the same licence as its original.
 
 As with the exercise media, these files are **not distributed in this repository** — they are
-git-ignored and fetched on demand. If you redistribute myOpenGym with them included, the
+git-ignored and fetched on demand. If you redistribute My Wellness with them included, the
 per-image attribution in the manifest is what you need to carry with them.

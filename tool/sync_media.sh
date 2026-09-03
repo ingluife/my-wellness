@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Copies the exercise media out of the openGym checkout into assets/.
 #
-# The mobile flavor of openGym pulls these off a CDN; myOpenGym bundles them so the library
+# The mobile flavor of openGym pulls these off a CDN; My Wellness bundles them so the library
 # works with no network at all. That is ~137 MB, so the two directories are git-ignored and
 # this script is what populates them — locally and in CI.
 set -euo pipefail

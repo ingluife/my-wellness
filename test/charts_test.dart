@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/ui/theme/app_theme.dart';
-import 'package:my_open_gym/ui/theme/tokens.dart';
-import 'package:my_open_gym/ui/widgets/heatmap.dart';
-import 'package:my_open_gym/ui/widgets/line_chart.dart';
-import 'package:my_open_gym/ui/widgets/macro_bar.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/ui/theme/app_theme.dart';
+import 'package:my_wellness/ui/theme/tokens.dart';
+import 'package:my_wellness/ui/widgets/heatmap.dart';
+import 'package:my_wellness/ui/widgets/line_chart.dart';
+import 'package:my_wellness/ui/widgets/macro_bar.dart';
 
 void main() {
   setUpAll(() async {
