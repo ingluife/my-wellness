@@ -5,11 +5,13 @@ import '../../data/models/app_state.dart';
 import '../../domain/format.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
+import '../../domain/nutrition.dart';
 import '../../state/app_state_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
 import '../widgets/controls/surfaces.dart';
+import '../widgets/macro_bar.dart';
 import '../widgets/page.dart';
 import 'plan_sheets.dart';
 import 'sheet_service.dart';
@@ -76,7 +78,10 @@ class _CalendarState extends ConsumerState<_Calendar> {
       cells.add(GestureDetector(
         onTap: () {
           widget.close();
-          if (ws == null) {
+          if (iso.compareTo(todayISO()) < 0) {
+            // A past day cannot be planned, only reviewed — ISO date strings sort by date.
+            daySummarySheet(iso);
+          } else if (ws == null) {
             dayOverrideSheet(iso);
           } else if (ws.length == 1) {
             workoutDetailSheet(ws.first);
@@ -181,8 +186,96 @@ class _CalendarState extends ConsumerState<_Calendar> {
           ],
         ),
         const SizedBox(height: 10),
-        Text(t('Tap a trained day for details · tap any other day to plan a session'),
+        Text(t('Tap a past day for its recap · tap a future day to plan a session'),
             textAlign: TextAlign.center, style: ts(TypeScale.foot, color: c.label3)),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+/// A read-only recap of one past day: what was planned and whether it was trained, the
+/// nutrition logged that day, and the body weight if there was a weigh-in. Opened from the
+/// calendar for any date before today — the past can be reviewed, not planned.
+Future<void> daySummarySheet(String iso) =>
+    showSheet<void>((context, close) => _DaySummary(iso: iso, close: close));
+
+class _DaySummary extends ConsumerWidget {
+  const _DaySummary({required this.iso, required this.close});
+
+  final String iso;
+  final void Function([void]) close;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.c;
+    final s = ref.watch(appStateProvider);
+
+    final ws = s.workouts.where((w) => w.d == iso).toList();
+    final effId = effectiveRoutineId(s, iso);
+    Routine? planned;
+    for (final r in s.routines) {
+      if (r.id == effId) planned = r;
+    }
+    final status = ws.isNotEmpty
+        ? t('Trained')
+        : (planned != null ? t('Missed') : t('Rest day'));
+
+    final target = macroTargets(s);
+    final eaten = dayTotals(s, iso);
+
+    double? bw;
+    for (final b in s.bodyweight) {
+      if (b.d == iso) bw = b.w;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SheetTitle(fmtDate(iso, true)),
+        Text([planned?.name ?? t('Rest'), status].join(' · '),
+            style: ts(TypeScale.foot, color: c.label2)),
+        const SizedBox(height: 12),
+        if (ws.isNotEmpty)
+          AppList(children: [
+            for (final w in ws)
+              WorkoutRow(
+                workout: w,
+                onTap: () {
+                  close();
+                  workoutDetailSheet(w);
+                },
+              ),
+          ]),
+        if (target != null) ...[
+          if (ws.isNotEmpty) const SizedBox(height: 6),
+          Text(t('Nutrition'), style: ts(TypeScale.foot, color: c.label2)),
+          const SizedBox(height: 10),
+          Row(children: [
+            KcalRing(
+                eaten: eaten.kcal,
+                target: (macroTargets(s, iso: iso) ?? target).kcal,
+                size: 84),
+            const SizedBox(width: 18),
+            Expanded(
+              child: MacroBars(
+                  eaten: eaten,
+                  target: macroTargets(s, iso: iso) ?? target,
+                  compact: true),
+            ),
+          ]),
+        ],
+        if (bw != null) ...[
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(
+                child: Text(t('Body weight'),
+                    style: ts(TypeScale.foot, color: c.label2))),
+            Text('${fmtNum(bw)} ${s.unit}',
+                style: ts(TypeScale.body, color: c.label, weight: FontWeight.w600)),
+          ]),
+        ],
         const SizedBox(height: 8),
       ],
     );

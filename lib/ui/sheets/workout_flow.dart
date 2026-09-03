@@ -371,26 +371,10 @@ class _FinishSummary extends ConsumerWidget {
             textAlign: TextAlign.center,
             style: ts(TypeScale.title2, color: c.label, size: 20, weight: FontWeight.w600)),
         const SizedBox(height: 12),
-        StatTiles(
-          icons: const ['clock', 'dumbbell', 'list', 'flame'],
-          tiles: [
-            (label: t('Duration'), value: fmtDur(workout.end - workout.start), unit: null, color: null),
-            (label: t('Volume'), value: fmtNum(workout.vol), unit: s.unit, color: null),
-            (label: t('Sets'), value: '${setsDone(workout)}', unit: null, color: null),
-            // Burned, not PRs, when there is a body weight to work it out from — the estimate
-            // is never more meaningful than in the minute the session ends. PRs keep the slot
-            // otherwise, and they get their own lines below either way.
-            if (_burn(s) != null)
-              (
-                label: t('Burned'),
-                value: '${workoutBurn(workout, _burn(s)!).round()}',
-                unit: t('kcal'),
-                color: null,
-              )
-            else
-              (label: t('PRs'), value: prs.isEmpty ? '—' : '${prs.length}', unit: null, color: null),
-          ],
-        ),
+        // Burned, not PRs, when there is a body weight to work it out from — the estimate is
+        // never more meaningful than in the minute the session ends. PRs keep the slot
+        // otherwise, and they get their own lines below either way.
+        StatTiles(icons: workoutStatIcons, tiles: workoutStatTiles(workout, s)),
         if (prs.isNotEmpty || e1prs.isNotEmpty) ...[
           const SizedBox(height: 4),
           for (final id in prs)
@@ -416,9 +400,6 @@ class _FinishSummary extends ConsumerWidget {
     );
   }
 }
-
-/// Body weight in kg, or null when there has never been a weigh-in.
-double? _burn(AppState s) => bodyKg(s);
 
 class _PrLine extends StatelessWidget {
   const _PrLine({required this.icon, required this.title, required this.subtitle});
@@ -465,6 +446,28 @@ class _PrLine extends StatelessWidget {
 /// suffix is what pushes a wide value (a five-figure volume, a calorie count) past the tile's
 /// width, so it renders a size step down instead of fighting the number for the same line.
 typedef StatTile = ({String label, String value, Color? color, String? unit});
+
+/// Icons for [workoutStatTiles], in the same order.
+const List<String> workoutStatIcons = ['clock', 'dumbbell', 'list', 'flame'];
+
+/// The canonical headline tiles for one finished workout — Duration, Volume, Sets, and either
+/// Burned kcal (when there is a body weight to cost the session at) or the PR count. Shared by
+/// the finish summary, the History detail sheet and the Home "done today" card so the three
+/// stay in sync.
+List<StatTile> workoutStatTiles(Workout w, AppState s) {
+  // A look back at a session that may be weeks old is costed at its own weigh-in, not today's
+  // body weight; fall back to the latest known weight.
+  final kg = w.bw != null ? kgOf(w.bw!, s.unit) : bodyKg(s);
+  return [
+    (label: t('Duration'), value: fmtDur(w.end - w.start), unit: null, color: null),
+    (label: t('Volume'), value: fmtNum(w.vol), unit: s.unit, color: null),
+    (label: t('Sets'), value: '${setsDone(w)}', unit: null, color: null),
+    if (kg != null)
+      (label: t('Burned'), value: '${workoutBurn(w, kg).round()}', unit: t('kcal'), color: null)
+    else
+      (label: t('PRs'), value: w.prs.isEmpty ? '—' : '${w.prs.length}', unit: null, color: null),
+  ];
+}
 
 class StatTiles extends StatelessWidget {
   const StatTiles({super.key, required this.tiles, this.icons});
@@ -608,9 +611,6 @@ class _WorkoutDetail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.c;
     final s = ref.watch(appStateProvider);
-    // The workout's own weigh-in when it has one — this is a look back at a session that may be
-    // weeks old, so the live body weight would be the wrong number to cost it at.
-    final kg = workout.bw != null ? kgOf(workout.bw!, s.unit) : bodyKg(s);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -626,23 +626,7 @@ class _WorkoutDetail extends ConsumerWidget {
           style: ts(TypeScale.foot, color: c.label2),
         ),
         const SizedBox(height: 12),
-        StatTiles(
-          icons: const ['clock', 'dumbbell', 'list', 'flame'],
-          tiles: [
-            (label: t('Duration'), value: fmtDur(workout.end - workout.start), unit: null, color: null),
-            (label: t('Volume'), value: fmtNum(workout.vol), unit: s.unit, color: null),
-            (label: t('Sets'), value: '${setsDone(workout)}', unit: null, color: null),
-            if (kg != null)
-              (
-                label: t('Burned'),
-                value: '${workoutBurn(workout, kg).round()}',
-                unit: t('kcal'),
-                color: null,
-              )
-            else
-              (label: t('PRs'), value: workout.prs.isEmpty ? '—' : '${workout.prs.length}', unit: null, color: null),
-          ],
-        ),
+        StatTiles(icons: workoutStatIcons, tiles: workoutStatTiles(workout, s)),
         for (final e in workout.entries)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),

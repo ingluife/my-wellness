@@ -132,14 +132,19 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ui = ref.watch(uiProvider);
     final active = ref.watch(appStateProvider.select((s) => s.active != null));
+    // Today already trained, nothing running: the Start disc becomes a "Done" marker rather
+    // than a button that would quietly start a second session.
+    final doneToday = ref.watch(appStateProvider
+        .select((s) => s.active == null && s.workouts.any((w) => w.d == todayISO())));
 
     return ListenableBuilder(
       listenable: ui,
-      builder: (context, _) => _shell(context, ref, ui, active),
+      builder: (context, _) => _shell(context, ref, ui, active, doneToday),
     );
   }
 
-  Widget _shell(BuildContext context, WidgetRef ref, UiController ui, bool active) {
+  Widget _shell(
+      BuildContext context, WidgetRef ref, UiController ui, bool active, bool doneToday) {
     final timerShowing = ui.timer != null;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     // A Material ancestor, and the page's own background in one: text fields and anything else
@@ -164,8 +169,9 @@ class AppShell extends ConsumerWidget {
             child: AppTabBar(
               current: _tabKey,
               workoutRunning: active,
+              todayComplete: doneToday,
               onTap: (route) => appNavigatorKey.currentContext?.go(route),
-              onStart: () => _start(context, ref, active),
+              onStart: () => _start(context, ref, active, doneToday),
             ),
           ),
           Positioned(
@@ -188,8 +194,10 @@ class AppShell extends ConsumerWidget {
   /// The Start button starts today's session directly when there is one to start, and only
   /// falls back to the chooser when there is not — the fewest taps between opening the app and
   /// logging a set.
-  void _start(BuildContext context, WidgetRef ref, bool running) {
-    if (!running) {
+  void _start(BuildContext context, WidgetRef ref, bool running, bool complete) {
+    // Once today is done, tapping the disc goes to the workout screen rather than auto-starting
+    // a fresh session — a second workout is still possible, just not on a single stray tap.
+    if (!running && !complete) {
       final s = ref.read(appStateProvider);
       final r = effectiveRoutine(s, todayISO());
       if (r != null && r.ex.isNotEmpty) {

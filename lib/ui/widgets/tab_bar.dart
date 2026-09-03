@@ -51,6 +51,7 @@ class AppTabBar extends StatelessWidget {
     required this.onTap,
     required this.onStart,
     required this.workoutRunning,
+    required this.todayComplete,
   });
 
   /// The first path segment: 'home' | 'plan' | 'workout' | 'stats' | 'library' | …
@@ -61,6 +62,9 @@ class AppTabBar extends StatelessWidget {
 
   /// A running workout turns the disc orange and gives it a pulsing ring.
   final bool workoutRunning;
+
+  /// Today is trained and nothing is running: the disc shows a check and reads "Done".
+  final bool todayComplete;
 
   /// History is reached from Stats, the exercise catalogue from Plan, and Settings from Home, so
   /// each keeps its parent lit rather than leaving no tab selected at all.
@@ -144,7 +148,8 @@ class AppTabBar extends StatelessWidget {
         // whole disc both visible and tappable, the two things the old Transform gave up.
         Positioned(
           top: 0,
-          child: _StartButton(running: workoutRunning, onTap: onStart),
+          child: _StartButton(
+              running: workoutRunning, complete: todayComplete, onTap: onStart),
         ),
       ],
     );
@@ -209,9 +214,10 @@ class _Tab extends StatelessWidget {
 /// Sizes itself rather than taking a share of the row: it is no longer *in* the row, it is
 /// positioned over the berth the row leaves for it. See [AppTabBar].
 class _StartButton extends StatefulWidget {
-  const _StartButton({required this.running, required this.onTap});
+  const _StartButton({required this.running, required this.complete, required this.onTap});
 
   final bool running;
+  final bool complete;
   final VoidCallback onTap;
 
   @override
@@ -252,6 +258,9 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
   Widget build(BuildContext context) {
     final c = context.c;
     final running = widget.running;
+    // Trained today, nothing running: a check and "Done" instead of a Start prompt. The disc
+    // stays accent — the glyph and label carry the state, and there is no pulsing ring.
+    final complete = widget.complete && !running;
     // The disc is orange in either theme, so its glyph is black rather than `--on-acc`.
     final disc = running ? c.sys.orange : c.acc;
     final glyph = running ? const Color(0xFF000000) : c.onAcc;
@@ -315,7 +324,7 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
                       ),
                       alignment: Alignment.center,
                       child: AppIcon(
-                        running ? 'play' : 'dumbbell',
+                        running ? 'play' : (complete ? 'check' : 'dumbbell'),
                         size: 26,
                         color: glyph,
                         stroke: 2,
@@ -327,7 +336,7 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
             ),
             const SizedBox(height: _labelGap),
             Text(
-              running ? t('Resume') : t('Start'),
+              running ? t('Resume') : (complete ? t('Done') : t('Start')),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,

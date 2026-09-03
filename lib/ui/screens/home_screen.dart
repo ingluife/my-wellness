@@ -176,6 +176,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final sunday = DateTime(monday.year, monday.month, monday.day + 6, 12);
     final doneDays = {for (final w in s.workouts) w.d};
 
+    final todayWorkouts = s.workouts.where((w) => w.d == todayISO()).toList();
+    // Finished, not in progress (s.active is cleared at finish). The latest session wins when
+    // a day holds several — e.g. a freestyle logged on top of the planned one.
+    final doneToday = s.active == null && todayWorkouts.isNotEmpty
+        ? todayWorkouts.reduce((a, b) => b.end >= a.end ? b : a)
+        : null;
+
     final label = _weekOffset == 0
         ? t('This week')
         : '${monday.day} ${DateFormat.MMM(dateLocale).format(monday)} – '
@@ -183,8 +190,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return AppCard(
       // This card is the call to action, so it wears the outline [AppCard.borderColor] is
-      // reserved for — see the doc on that field.
-      borderColor: c.accLine,
+      // reserved for — see the doc on that field. Once today is trained there is nothing left
+      // to act on, so the outline drops away.
+      borderColor: doneToday != null ? null : c.accLine,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -215,19 +223,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _todayRow(context, s, routine, overridden),
+          _todayRow(context, s, routine, overridden, doneToday),
+          if (doneToday != null) ...[
+            const SizedBox(height: 10),
+            Pressable(
+              scale: 1,
+              onTap: () => workoutDetailSheet(doneToday),
+              child: StatTiles(
+                  icons: workoutStatIcons, tiles: workoutStatTiles(doneToday, s)),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _todayRow(BuildContext context, AppState s, Routine? routine, bool overridden) {
+  Widget _todayRow(BuildContext context, AppState s, Routine? routine, bool overridden,
+      Workout? doneWorkout) {
     final c = context.c;
     final active = s.active;
+    final done = active == null && doneWorkout != null;
 
     void onTap() {
       if (active != null) {
         context.go('/workout');
+      } else if (done) {
+        workoutDetailSheet(doneWorkout);
       } else if (routine != null) {
         startFlow(ref, routine.id);
       } else {
@@ -248,10 +269,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Row(
           children: [
             GlyphTile(
-              active != null ? 'timer' : (routine != null ? glyphOf(routine.emoji) : 'moon'),
+              active != null
+                  ? 'timer'
+                  : (done ? 'check' : (routine != null ? glyphOf(routine.emoji) : 'moon')),
               background: active != null
                   ? c.sys.orange
-                  : (routine != null ? c.acc : c.surface3),
+                  : (done || routine != null ? c.acc : c.surface3),
             ),
             const SizedBox(width: 9),
             Expanded(
@@ -266,9 +289,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Text(
                     active != null
                         ? t('{0} — in progress', active.name)
-                        : (routine != null
-                            ? '${routine.name}${overridden ? ' · ${t('rescheduled')}' : ''}'
-                            : t('Rest day')),
+                        : (done
+                            ? doneWorkout.name
+                            : (routine != null
+                                ? '${routine.name}${overridden ? ' · ${t('rescheduled')}' : ''}'
+                                : t('Rest day'))),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: ts(TypeScale.body, color: c.label, weight: FontWeight.w500),
@@ -282,6 +307,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   capitalize: false,
                   color: c.sys.orange,
                   background: mixT(c.sys.orange, .16))
+            else if (done)
+              Tag(t('Done'),
+                  icon: 'check',
+                  capitalize: false,
+                  color: c.acc,
+                  background: c.accSoft)
             else if (routine != null)
               Tag(t('Start'), accent: true, capitalize: false)
             else
