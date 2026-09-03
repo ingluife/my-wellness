@@ -58,3 +58,11 @@ app.*.map.json
 # Android release signing
 /android/key.properties
 /android/app/*.jks
+
+# Firebase secrets & generated config — never commit these
+tool/firebase/service-account.json
+android/app/src/google-services.json
+tool/firebase/node_modules/
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
