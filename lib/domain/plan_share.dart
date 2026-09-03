@@ -52,10 +52,12 @@ Map<String, dynamic> _cleanEx(ExerciseConfig e) {
   return o;
 }
 
-/// Build the shareable bundle: every routine, the week schedule, referenced customs.
-Map<String, dynamic> buildPlanBundle(AppState s, String name) {
+/// The body of every plan file: the given routines, the customs those routines use, and — for
+/// a whole-plan export — the week that schedules them.
+Map<String, dynamic> _bundle(AppState s, String name, Iterable<Routine> from,
+    {bool withWeek = true}) {
   final routines = [
-    for (final r in s.routines)
+    for (final r in from)
       {
         'id': r.id,
         'name': r.name,
@@ -79,9 +81,11 @@ Map<String, dynamic> buildPlanBundle(AppState s, String name) {
         }
   ];
   final week = <String, String>{};
-  for (final d in _weekOrder) {
-    final v = s.week['$d'];
-    if (v != null) week['$d'] = v;
+  if (withWeek) {
+    for (final d in _weekOrder) {
+      final v = s.week['$d'];
+      if (v != null) week['$d'] = v;
+    }
   }
   return {
     'opengym_plan': _planFormat,
@@ -92,6 +96,37 @@ Map<String, dynamic> buildPlanBundle(AppState s, String name) {
     'customEx': customEx,
   };
 }
+
+/// Build the shareable bundle: every routine, the week schedule, referenced customs.
+Map<String, dynamic> buildPlanBundle(AppState s, String name) =>
+    _bundle(s, name, s.routines);
+
+/// One routine as a plan file of its own — the same envelope, so a friend imports it with the
+/// importer they already have.
+///
+/// The week is deliberately left out: one routine cannot describe somebody's week, and
+/// carrying a schedule would offer to replace all seven of their days to deliver one routine.
+/// An empty week also keeps the schedule switch out of the import sheet.
+Map<String, dynamic> buildRoutineBundle(AppState s, Routine r) =>
+    _bundle(s, r.name, [r], withWeek: false);
+
+/// A routine name reduced to something every filesystem and share target accepts.
+String _slug(String name) {
+  var out = name
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  if (out.length > 40) out = out.substring(0, 40).replaceAll(RegExp(r'-+$'), '');
+  return out.isEmpty ? 'routine' : out;
+}
+
+/// What a shared routine file is called. `opengym-` matches the plan and backup files, and the
+/// `opengym_plan` marker inside them — the wire format did not change when the app was renamed.
+///
+/// A name with nothing sluggable in it (`推日`) falls back to `routine`; the real name still
+/// travels inside the file and is what the other end's import sheet shows.
+String routineFileName(Routine r) =>
+    'opengym-routine-${_slug(r.name)}-${todayISO()}.json';
 
 /// A plan file, validated and counted.
 class PlanBundle {
@@ -173,13 +208,32 @@ PlanBundle parsePlan(String raw) {
   );
 }
 
+/// The routine an incoming single-routine file would duplicate, or null.
+///
+/// Matched on name alone — case-insensitive and trimmed — because that is how someone
+/// recognises "I already have this one". A file carrying more than one routine returns null
+/// and imports unchanged: asking about five collisions at once would be a worse trade than
+/// letting them append. The test is the count, not where the file came from, so a whole-plan
+/// export that happens to hold a single routine is offered the same choice — which is what you
+/// would want, since such a file is a single-routine share in all but name.
+Routine? duplicateOf(AppState s, PlanBundle b) {
+  if (b.routines.length != 1) return null;
+  final name = ((b.routines.single['name'] as String?) ?? '').trim().toLowerCase();
+  if (name.isEmpty) return null;
+  return s.routines.where((r) => r.name.trim().toLowerCase() == name).firstOrNull;
+}
+
 /// Merge a parsed bundle into a draft state.
 ///
 ///  - customs: reuse one you already have with the same name and body part, else add it fresh
 ///  - routines: always added as NEW routines with fresh ids — never overwrites yours
 ///  - schedule: optional; when on, the shared week REPLACES yours, because a half-overwritten
 ///    week would silently mix two plans
-void mergePlan(AppState s, PlanBundle bundle, {bool schedule = false}) {
+///  - replaceId: optional; the one routine to overwrite in place instead of adding. Used when
+///    an imported routine collides by name with one you already have and you chose to replace
+///    it — see [duplicateOf].
+void mergePlan(AppState s, PlanBundle bundle,
+    {bool schedule = false, String? replaceId}) {
   final exIdMap = <String, String>{};
   for (final c in bundle.customEx) {
     final n = (c['n'] as String? ?? '').toLowerCase();
@@ -201,20 +255,37 @@ void mergePlan(AppState s, PlanBundle bundle, {bool schedule = false}) {
 
   final ridMap = <String, String>{};
   for (final r in bundle.routines) {
+    final ex = [
+      for (final e in r['ex'] as List)
+        ExerciseConfig.fromJson(Map<String, dynamic>.from(e as Map))
+          ..id = exIdMap[e['id']] ?? e['id'] as String?
+    ];
+    final name = (r['name'] as String?)?.isNotEmpty == true
+        ? r['name'] as String
+        : t('Shared routine');
+
+    // Replacing keeps the existing id, so whatever weekday the routine is scheduled on stays
+    // scheduled — minting a fresh id would silently unschedule it.
+    final target = replaceId == null
+        ? null
+        : s.routines.where((x) => x.id == replaceId).firstOrNull;
+    if (target != null) {
+      target.name = name;
+      target.emoji = r['emoji'] as String?;
+      target.prog = r['prog'] as String?;
+      target.ex = ex;
+      ridMap[r['id'] as String? ?? target.id] = target.id;
+      continue;
+    }
+
     final nid = uid();
     ridMap[r['id'] as String? ?? nid] = nid;
     s.routines.add(Routine(
       id: nid,
-      name: (r['name'] as String?)?.isNotEmpty == true
-          ? r['name'] as String
-          : t('Shared routine'),
+      name: name,
       emoji: r['emoji'] as String?,
       prog: r['prog'] as String?,
-      ex: [
-        for (final e in r['ex'] as List)
-          ExerciseConfig.fromJson(Map<String, dynamic>.from(e as Map))
-            ..id = exIdMap[e['id']] ?? e['id'] as String?
-      ],
+      ex: ex,
     ));
   }
 

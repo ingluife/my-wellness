@@ -330,10 +330,29 @@ class _PlanImport extends ConsumerStatefulWidget {
 class _PlanImportState extends ConsumerState<_PlanImport> {
   bool _schedule = false;
 
+  void _commit({String? replaceId, required String toast}) {
+    ref.read(appStateProvider.notifier).update(
+        (st) => mergePlan(st, widget.bundle, schedule: _schedule, replaceId: replaceId));
+    widget.close();
+    ref.read(uiProvider).toast(toast);
+    appNavigatorKey.currentContext?.go('/plan');
+  }
+
+  /// The plain import, and the "Keep both" answer to a name collision.
+  void _add() => _commit(
+        toast: t(
+            widget.bundle.routineCount == 1
+                ? 'Added {0} routine to your plan'
+                : 'Added {0} routines to your plan',
+            widget.bundle.routineCount),
+      );
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final b = widget.bundle;
+    // Only ever set for a single-routine file — a whole plan imports as it always has.
+    final dup = duplicateOf(ref.watch(appStateProvider), b);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -364,6 +383,11 @@ class _PlanImportState extends ConsumerState<_PlanImport> {
             style: ts(TypeScale.foot, color: c.sys.yellow),
           ),
         ],
+        if (dup != null) ...[
+          const SizedBox(height: 14),
+          Text(t('You already have a routine called “{0}”.', dup.name),
+              style: ts(TypeScale.foot, color: c.sys.yellow)),
+        ],
         if (b.scheduledDays > 0) ...[
           const SizedBox(height: 16),
           Container(
@@ -391,14 +415,17 @@ class _PlanImportState extends ConsumerState<_PlanImport> {
           ),
         ],
         const SizedBox(height: 16),
-        AppButton(t('Add to my plan'), variant: BtnVariant.primary, onTap: () {
-          ref
-              .read(appStateProvider.notifier)
-              .update((st) => mergePlan(st, b, schedule: _schedule));
-          widget.close();
-          ref.read(uiProvider).toast(t('Added {0} routines to your plan', b.routineCount));
-          appNavigatorKey.currentContext?.go('/plan');
-        }),
+        if (dup != null) ...[
+          // Replacing overwrites the routine in place, keeping its id — so a weekday it is
+          // scheduled on stays scheduled.
+          AppButton(t('Replace it'),
+              variant: BtnVariant.primary,
+              onTap: () => _commit(
+                  replaceId: dup.id, toast: t('Replaced “{0}”', dup.name))),
+          const SizedBox(height: 8),
+          AppButton(t('Keep both'), variant: BtnVariant.tinted, onTap: _add),
+        ] else
+          AppButton(t('Add to my plan'), variant: BtnVariant.primary, onTap: _add),
         const SizedBox(height: 8),
         AppButton(t('Cancel'),
             variant: BtnVariant.ghost, color: c.label3, onTap: widget.close),

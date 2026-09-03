@@ -9,7 +9,9 @@ import '../../domain/glyphs.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
 import '../../domain/muscles.dart';
+import '../../domain/plan_share.dart';
 import '../../domain/progression.dart';
+import '../../platform/backup.dart';
 import '../../state/app_state_provider.dart';
 import '../sheets/exercise_sheets.dart';
 import '../sheets/plan_sheets.dart';
@@ -199,6 +201,23 @@ class _RoutineEditScreenState extends ConsumerState<RoutineEditScreen> {
                 routine: r,
                 onSave: (cfg) => _edit((list) => list.add(cfg.copy()..id = ex.id)),
               )),
+        ),
+        const SizedBox(height: 10),
+        // Tinted, not primary: 'Add exercise' above is already this screen's one filled slab,
+        // and two stacked primaries read as two equal calls to action. The OS share sheet is
+        // the only feedback needed, exactly as for the whole-plan export.
+        AppButton(
+          t('Share routine'),
+          variant: BtnVariant.tinted,
+          icon: 'upload',
+          enabled: r.ex.isNotEmpty,
+          onTap: () async {
+            try {
+              await Backup.shareJson(buildRoutineBundle(s, r), routineFileName(r));
+            } catch (_) {
+              // The share sheet was dismissed.
+            }
+          },
         ),
         const SizedBox(height: 10),
         AppButton(
