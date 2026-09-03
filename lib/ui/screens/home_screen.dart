@@ -51,7 +51,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return AppPage(
       children: [
         PageHeader(
-          title: 'openGym',
+          title: 'My Wellness',
           subtitle: DateFormat('EEEE, d MMMM', dateLocale).format(today),
           trailing: IconButtonRound('gear', onTap: () => context.go('/settings')),
         ),
@@ -146,17 +146,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           (
             label: t('this week'),
             value: planned > 0 ? '$thisWeek/$planned' : '$thisWeek',
+            unit: null,
             color: null,
           ),
-          (label: t('Week streak'), value: '${streakWeeks(s)}', color: null),
+          (label: t('Week streak'), value: '${streakWeeks(s)}', unit: null, color: null),
           (
             label: t('Eaten this week'),
             value: budget == null ? '—' : '${budget.spent.round()}/${budget.budget.round()}',
+            unit: null,
             color: budget != null && budget.left < 0 ? c.sys.orange : null,
           ),
           (
             label: t('Body weight'),
-            value: bw == null ? '—' : '${fmtNum(bw.w)} ${s.unit}',
+            value: bw == null ? '—' : fmtNum(bw.w),
+            unit: bw == null ? null : s.unit,
             color: weightColor,
           ),
         ],

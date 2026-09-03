@@ -64,14 +64,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         StatTiles(
           icons: const ['dumbbell', 'calendar', 'flame', 'scale'],
           tiles: [
-            (label: t('Workouts'), value: '${s.workouts.length}', color: null),
-            (label: t('This month'), value: '$monthW', color: null),
-            (label: t('Week streak'), value: '${streakWeeks(s)}', color: null),
+            (label: t('Workouts'), value: '${s.workouts.length}', unit: null, color: null),
+            (label: t('This month'), value: '$monthW', unit: null, color: null),
+            (label: t('Week streak'), value: '${streakWeeks(s)}', unit: null, color: null),
             (
               label: t('Weight 30d'),
-              value: bwDelta30 == null
-                  ? '—'
-                  : '${bwDelta30 > 0 ? '+' : ''}${fmtNum(bwDelta30)} ${s.unit}',
+              value: bwDelta30 == null ? '—' : '${bwDelta30 > 0 ? '+' : ''}${fmtNum(bwDelta30)}',
+              unit: bwDelta30 == null ? null : s.unit,
               color: bwDelta30 == null
                   ? null
                   : bwDeltaColor(context, bwDelta30, lastBW(s)?.w ?? 0, s.targetW),

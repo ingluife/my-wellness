@@ -67,10 +67,11 @@ class AppButton extends StatelessWidget {
       if (icon != null) AppIcon(icon!, size: iconSize, color: fg),
       if (label != null)
         Flexible(
+          // Wraps rather than clips: a label too long for one line grows the button down
+          // instead of losing its tail to "…".
           child: Text(
             label!,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
             textAlign: TextAlign.center,
             style: ts(TypeScale.body, color: fg, weight: weight, size: fontSize),
           ),

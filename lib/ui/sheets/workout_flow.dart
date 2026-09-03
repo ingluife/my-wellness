@@ -358,33 +358,51 @@ class _FinishSummary extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(child: AppIcon('trophy', size: 44, color: c.acc)),
-        const SizedBox(height: 8),
+        Center(
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(color: c.accSoft, shape: BoxShape.circle),
+            child: Center(child: AppIcon('trophy', size: 32, color: c.acc)),
+          ),
+        ),
+        const SizedBox(height: 10),
         Text(t('Workout complete!'),
             textAlign: TextAlign.center,
             style: ts(TypeScale.title2, color: c.label, size: 20, weight: FontWeight.w600)),
         const SizedBox(height: 12),
-        StatTiles(tiles: [
-          (label: t('Duration'), value: fmtDur(workout.end - workout.start), color: null),
-          (label: t('Volume'), value: fmtVol(workout.vol, s.unit), color: null),
-          (label: t('Sets'), value: '${setsDone(workout)}', color: null),
-          // Burned, not PRs, when there is a body weight to work it out from — the estimate
-          // is never more meaningful than in the minute the session ends. PRs keep the slot
-          // otherwise, and they get their own lines below either way.
-          if (_burn(s) != null)
-            (label: t('Burned'), value: '${workoutBurn(workout, _burn(s)!).round()} ${t('kcal')}', color: null)
-          else
-            (label: t('PRs'), value: prs.isEmpty ? '—' : '${prs.length}', color: null),
-        ]),
+        StatTiles(
+          icons: const ['clock', 'dumbbell', 'list', 'flame'],
+          tiles: [
+            (label: t('Duration'), value: fmtDur(workout.end - workout.start), unit: null, color: null),
+            (label: t('Volume'), value: fmtNum(workout.vol), unit: s.unit, color: null),
+            (label: t('Sets'), value: '${setsDone(workout)}', unit: null, color: null),
+            // Burned, not PRs, when there is a body weight to work it out from — the estimate
+            // is never more meaningful than in the minute the session ends. PRs keep the slot
+            // otherwise, and they get their own lines below either way.
+            if (_burn(s) != null)
+              (
+                label: t('Burned'),
+                value: '${workoutBurn(workout, _burn(s)!).round()}',
+                unit: t('kcal'),
+                color: null,
+              )
+            else
+              (label: t('PRs'), value: prs.isEmpty ? '—' : '${prs.length}', unit: null, color: null),
+          ],
+        ),
         if (prs.isNotEmpty || e1prs.isNotEmpty) ...[
+          const SizedBox(height: 4),
           for (final id in prs)
-            _PrLine(icon: 'trophy', text: '${t('New PR:')} ${capitalized(exdb.or(id).n)}'),
+            _PrLine(
+                icon: 'trophy', title: capitalized(exdb.or(id).n), subtitle: t('New PR:')),
           for (final p in e1prs)
             _PrLine(
-                icon: 'chartLine',
-                text:
-                    '${t('Best estimated 1RM:')} ${capitalized(exdb.or(p.id).n)} · ${fmtNum(p.est)} ${s.unit}'),
-          const SizedBox(height: 12),
+              icon: 'chartLine',
+              title: capitalized(exdb.or(p.id).n),
+              subtitle: '${t('Best estimated 1RM:')} · ${fmtNum(p.est)} ${s.unit}',
+            ),
+          const SizedBox(height: 8),
         ],
         Text(t('What you just trained'), style: ts(TypeScale.foot, color: c.label2)),
         const SizedBox(height: 8),
@@ -403,27 +421,50 @@ class _FinishSummary extends ConsumerWidget {
 double? _burn(AppState s) => bodyKg(s);
 
 class _PrLine extends StatelessWidget {
-  const _PrLine({required this.icon, required this.text});
+  const _PrLine({required this.icon, required this.title, required this.subtitle});
 
   final String icon;
-  final String text;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Row(children: [
-        AppIcon(icon, size: 13, color: c.acc),
-        const SizedBox(width: 5),
-        Expanded(child: Text(text, style: ts(TypeScale.foot, color: c.acc))),
-      ]),
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(color: c.accSoft, shape: BoxShape.circle),
+            child: Center(child: AppIcon(icon, size: 14, color: c.acc)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title,
+                    style: ts(TypeScale.sub, color: c.label, weight: FontWeight.w600)),
+                Text(subtitle, style: ts(TypeScale.foot, color: c.label2)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 /// A 2x2 (or 1x4) grid of headline numbers.
-typedef StatTile = ({String label, String value, Color? color});
+///
+/// `unit` is kept apart from `value` rather than baked into one formatted string: a unit
+/// suffix is what pushes a wide value (a five-figure volume, a calorie count) past the tile's
+/// width, so it renders a size step down instead of fighting the number for the same line.
+typedef StatTile = ({String label, String value, Color? color, String? unit});
 
 class StatTiles extends StatelessWidget {
   const StatTiles({super.key, required this.tiles, this.icons});
@@ -434,35 +475,54 @@ class StatTiles extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    Widget tile(int i) => Container(
-          padding: const EdgeInsets.all(14),
-          decoration:
-              BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(R.card)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(children: [
-                if (icons != null) ...[
-                  AppIcon(icons![i], size: 14, color: c.label),
-                  const SizedBox(width: 5),
-                ],
-                Flexible(
-                  child: Text(tiles[i].label,
+    Widget tile(int i) {
+      final unit = tiles[i].unit;
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration:
+            BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(R.card)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(children: [
+              if (icons != null) ...[
+                AppIcon(icons![i], size: 14, color: c.label2),
+                const SizedBox(width: 5),
+              ],
+              Flexible(
+                child: Text(tiles[i].label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ts(TypeScale.foot, color: c.label2)),
+              ),
+            ]),
+            const SizedBox(height: 5),
+            // Shrinks rather than clips: a value that would otherwise need an ellipsis scales
+            // down as a whole instead of losing its tail (or its unit) to "…".
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(tiles[i].value,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ts(TypeScale.foot, color: c.label2)),
-                ),
-              ]),
-              const SizedBox(height: 5),
-              Text(tiles[i].value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: ts(TypeScale.title,
-                      size: 26, color: tiles[i].color ?? c.label, weight: FontWeight.w600)),
-            ],
-          ),
-        );
+                      style: ts(TypeScale.title,
+                          size: 21, color: tiles[i].color ?? c.label, weight: FontWeight.w600)),
+                  if (unit != null && unit.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    Text(unit, maxLines: 1, style: ts(TypeScale.foot, color: c.label3)),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -566,15 +626,23 @@ class _WorkoutDetail extends ConsumerWidget {
           style: ts(TypeScale.foot, color: c.label2),
         ),
         const SizedBox(height: 12),
-        StatTiles(tiles: [
-          (label: t('Duration'), value: fmtDur(workout.end - workout.start), color: null),
-          (label: t('Volume'), value: fmtVol(workout.vol, s.unit), color: null),
-          (label: t('Sets'), value: '${setsDone(workout)}', color: null),
-          if (kg != null)
-            (label: t('Burned'), value: '${workoutBurn(workout, kg).round()} ${t('kcal')}', color: null)
-          else
-            (label: t('PRs'), value: workout.prs.isEmpty ? '—' : '${workout.prs.length}', color: null),
-        ]),
+        StatTiles(
+          icons: const ['clock', 'dumbbell', 'list', 'flame'],
+          tiles: [
+            (label: t('Duration'), value: fmtDur(workout.end - workout.start), unit: null, color: null),
+            (label: t('Volume'), value: fmtNum(workout.vol), unit: s.unit, color: null),
+            (label: t('Sets'), value: '${setsDone(workout)}', unit: null, color: null),
+            if (kg != null)
+              (
+                label: t('Burned'),
+                value: '${workoutBurn(workout, kg).round()}',
+                unit: t('kcal'),
+                color: null,
+              )
+            else
+              (label: t('PRs'), value: workout.prs.isEmpty ? '—' : '${workout.prs.length}', unit: null, color: null),
+          ],
+        ),
         for (final e in workout.entries)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),

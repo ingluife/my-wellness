@@ -89,7 +89,9 @@ void main() {
       ..targetW = 77;
     final container = await pump(tester, s);
 
-    expect(find.text('78.4'), findsOneWidget);
+    // Once on the weight curve's own headline, and once in the snapshot grid's "Body weight"
+    // tile, which renders its number apart from the unit so long values never need an ellipsis.
+    expect(find.text('78.4'), findsNWidgets(2));
     // The move since the previous weigh-in, as a magnitude with an arrow beside it.
     expect(find.text('1.6'), findsOneWidget);
     expect(find.byType(LineChart), findsOneWidget);
