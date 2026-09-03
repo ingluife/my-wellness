@@ -203,7 +203,6 @@ Future<T?> showCenterSheet<T>(
       child: Container(
         width: 300,
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * .8),
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: c.isDark ? c.bgEl : const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(R.lg),
@@ -211,9 +210,27 @@ Future<T?> showCenterSheet<T>(
             BoxShadow(color: Color(0x80000000), blurRadius: 60, offset: Offset(0, 20)),
           ],
         ),
-        child: SingleChildScrollView(
-          child: Builder(
-            builder: (inner) => builder(inner, ([result]) => Navigator.of(dialogCtx).pop(result)),
+        // `showSheet`'s bottom sheets get a Material ancestor for free — it is part of what
+        // `showModalBottomSheet` builds internally. This dialog is assembled by hand instead
+        // (a bottom sheet cannot be centred), so nothing supplies one unless this does. Without
+        // it, every Text here inherits whatever `DefaultTextStyle` happens to sit above the
+        // dialog route rather than the app's own — on at least one real device that showed up
+        // as a stray yellow underline under every line, which is what sent us looking for this.
+        // `clipBehavior` makes this Material respect the same rounded corners as the box it
+        // sits inside, and `type: transparency` means it paints nothing of its own — the
+        // BoxDecoration above is still the card's only visible surface.
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          type: MaterialType.transparency,
+          borderRadius: BorderRadius.circular(R.lg),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Builder(
+                builder: (inner) =>
+                    builder(inner, ([result]) => Navigator.of(dialogCtx).pop(result)),
+              ),
+            ),
           ),
         ),
       ),
