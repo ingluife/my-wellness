@@ -3,28 +3,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/app_state.dart';
+import '../../domain/ai/ai_provider.dart';
 import '../../domain/format.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
 import '../../state/app_state_provider.dart';
 import '../app.dart';
-import '../sheets/effort_help_sheet.dart';
-import '../../platform/backup.dart';
 import '../../platform/reminders.dart';
-import '../sheets/import_sheets.dart';
-import '../sheets/plan_sheets.dart';
-import '../sheets/sheet_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
-import '../widgets/app_icon.dart';
-import '../widgets/controls/pressable.dart';
 import '../widgets/controls/select_row.dart';
 import '../widgets/controls/surfaces.dart';
 import '../widgets/controls/toggles.dart';
 import '../widgets/page.dart';
+import 'data_settings_screen.dart';
 
-/// Everything the profile can decide about itself.
+/// Everything the profile can decide about itself — as an index, not as a list.
+///
+/// This screen used to hold all twenty-three of them in one scroll, which put the accent
+/// swatches at the same weight as "Reset everything" and left no way to see its shape at a
+/// glance. What stays here is what you change often (language, units) or need to *read* often;
+/// everything dense or set-once sits behind a row that shows its current value, so drilling in
+/// is for changing a setting, never for finding out what it is.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -40,16 +41,6 @@ class SettingsScreen extends ConsumerWidget {
           title: t('Settings'),
           leading: IconButtonRound('chevronLeft', onTap: () => context.go('/home')),
         ),
-
-        // ---------- your data ----------
-        Section(title: t('Your data'), children: [
-          AppRow(
-            icon: 'lock',
-            iconTint: c.acc,
-            title: t('All data stays on this phone'),
-            subtitle: t('No account, no cloud — back it up anytime with Export below.'),
-          ),
-        ]),
 
         // ---------- general ----------
         Section(
@@ -87,180 +78,62 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            AppRow(
+              icon: 'moon',
+              iconTint: c.sys.indigo,
+              title: t('Appearance'),
+              value: _appearanceLine(s),
+              accessory: RowAccessory.chevron,
+              onTap: () => context.go('/settings/appearance'),
+            ),
           ],
         ),
 
-        // ---------- during a workout ----------
+        // ---------- workouts ----------
+        //
+        // The reminder rows stay in place rather than following the rest behind a chevron: a
+        // single switch is not worth a screen, and the time it fires at is the kind of thing you
+        // want to confirm without a round trip.
+        WorkoutsSection(state: s),
+
+        // ---------- ai ----------
         Section(
-          title: t('During a workout'),
-          footer: t('The screen stays on while a workout is running, so you don’t have to unlock your phone between sets.'),
+          title: t('AI features'),
+          footer: t('Off unless you set it up, and it runs on your own provider account.'),
           children: [
-            SelectRow<double>(
-              icon: 'timer',
-              iconTint: c.sys.orange,
-              title: t('Rest timer'),
-              value: s.restSec,
-              onChanged: (v) => notifier.update((st) => st.restSec = v),
-              options: [
-                for (final v in [60.0, 90.0, 120.0, 150.0, 180.0])
-                  SelectOption(v, '${v.toInt()}s'),
-              ],
-            ),
             AppRow(
-              icon: 'sun',
-              iconTint: c.sys.yellow,
-              title: t('Keep screen awake'),
-              trailing: AppSwitch(
-                value: s.keepAwake,
-                onChanged: (v) => notifier.update((st) => st.keepAwake = v),
-              ),
-            ),
-            AppRow(
-              icon: 'bell',
-              iconTint: c.sys.pink,
-              title: t('Sounds'),
-              trailing: AppSwitch(
-                value: s.sound,
-                onChanged: (v) => notifier.update((st) => st.sound = v),
-              ),
-            ),
-            // Two names for the same judgement, so the column asks in the scale you already
-            // think in. The (i) sits before the control — you read it on the way to the
-            // choice, not after it.
-            AppRow(
-              icon: 'target',
+              icon: 'sparkles',
               iconTint: c.sys.purple,
-              title: t('Effort per set'),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                Pressable(
-                  onTap: effortHelpSheet,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: AppIcon('info', size: 16, color: c.label3),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                SizedBox(
-                  width: 150,
-                  child: Segmented<String>(
-                    inline: true,
-                    value: effortOf(s),
-                    onChanged: (v) => notifier.update((st) {
-                      st.effort = v;
-                      st.showRir = null;
-                    }),
-                    options: [
-                      SegOption('none', label: t('Off')),
-                      SegOption('rir', label: t('RIR')),
-                      SegOption('rpe', label: t('RPE')),
-                    ],
-                  ),
-                ),
-              ]),
+              title: t('AI providers'),
+              subtitle: _aiLine(s),
+              accessory: RowAccessory.chevron,
+              onTap: () => context.go('/settings/ai'),
             ),
           ],
         ),
-
-        ReminderSection(state: s),
-
-        // ---------- appearance ----------
-        Section(title: t('Appearance'), children: [
-          AppRow(
-            icon: 'moon',
-            iconTint: c.sys.indigo,
-            title: t('Theme'),
-            trailing: SizedBox(
-              width: 150,
-              child: Segmented<String>(
-                inline: true,
-                value: s.theme == 'light' ? 'light' : 'dark',
-                onChanged: (v) => notifier.update((st) => st.theme = v),
-                options: [
-                  SegOption('dark', icon: 'moon', label: t('Dark')),
-                  SegOption('light', icon: 'sun', label: t('Light')),
-                ],
-              ),
-            ),
-          ),
-          // Purely how the muscle map is drawn — nothing else in the app reads this.
-          AppRow(
-            icon: 'figureStrength',
-            iconTint: c.sys.teal,
-            title: t('Body diagram'),
-            trailing: SizedBox(
-              width: 150,
-              child: Segmented<String>(
-                inline: true,
-                value: s.body == 'female' ? 'female' : 'male',
-                onChanged: (v) => notifier.update((st) => st.body = v),
-                options: [
-                  SegOption('male', label: t('Male')),
-                  SegOption('female', label: t('Female')),
-                ],
-              ),
-            ),
-          ),
-          _AccentRow(
-            selected: accentFrom(s.accent),
-            onPick: (a) => notifier.update((st) => st.accent = a.name),
-          ),
-        ]),
 
         // ---------- data ----------
+        //
+        // One row doing two jobs. The promise this app makes about where your training log lives
+        // is the first thing the old screen said, and it still is — carried as the subtitle of
+        // the row that leads to everything that could move that log off the device.
         Section(title: t('Data'), children: [
           AppRow(
-            icon: 'sparkles',
+            icon: 'lock',
             iconTint: c.acc,
-            title: t('Load starter plan (PPL)'),
+            title: t('Your data'),
+            subtitle: anyAiOn(s)
+                ? t('Your training log stays on this phone')
+                : t('All data stays on this phone'),
             accessory: RowAccessory.chevron,
-            onTap: () => loadStarterPlan(ref),
-          ),
-          AppRow(
-            icon: 'shuffle',
-            iconTint: c.sys.teal,
-            title: t('Import from another app'),
-            subtitle: t('FitNotes, Strong, Hevy — or body weight from Apple Health'),
-            accessory: RowAccessory.chevron,
-            onTap: () => importFromAppFile(ref),
-          ),
-          AppRow(
-            icon: 'upload',
-            iconTint: c.sys.blue,
-            title: t('Import backup'),
-            accessory: RowAccessory.chevron,
-            onTap: () => importBackupFile(ref),
-          ),
-          AppRow(
-            icon: 'download',
-            iconTint: c.sys.blue,
-            title: t('Export backup (JSON)'),
-            accessory: RowAccessory.chevron,
-            onTap: () => exportBackup(ref),
-          ),
-          AppRow(
-            icon: 'trash',
-            iconTint: c.sys.red,
-            title: t('Reset everything'),
-            danger: true,
-            onTap: () => confirmSheet(
-              title: t('Reset everything?'),
-              message: t('Deletes your plan, workouts and body weight on this device. This cannot be undone.'),
-              confirmText: t('Delete everything'),
-              danger: true,
-              onConfirm: () async {
-                await ref.read(stateRepositoryProvider).clear();
-                notifier.replaceState(AppState.defaults());
-                if (context.mounted) context.go('/home');
-                ref.read(uiProvider).toast(t('All data reset'));
-              },
-            ),
+            onTap: () => context.go('/settings/data'),
           ),
         ]),
 
         Padding(
           padding: const EdgeInsets.only(top: 4, bottom: 20),
           child: Text(
-            'myOpenGym · ${t('free & open source (AGPL v3)')}\n'
+            'My Wellness · ${t('free & open source (AGPL v3)')}\n'
             'a Flutter translation of openGym · exercise data: hasaneyldrm/exercises-dataset (CC)',
             textAlign: TextAlign.center,
             style: ts(TypeScale.foot, color: c.label3),
@@ -271,60 +144,35 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-/// The eight accent swatches.
-class _AccentRow extends StatelessWidget {
-  const _AccentRow({required this.selected, required this.onPick});
-
-  final Accent selected;
-  final ValueChanged<Accent> onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(t('Accent color'), style: ts(TypeScale.body, color: c.label)),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              for (final a in Accent.values)
-                Pressable(
-                  scale: .9,
-                  onTap: () => onPick(a),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: accentSwatch[a],
-                      shape: BoxShape.circle,
-                      // The selected swatch gets a ring set off from it, so the colour itself
-                      // is never overlaid by the indicator.
-                      border: a == selected
-                          ? Border.all(color: c.label, width: 2)
-                          : null,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+/// 'Anthropic · Claude Opus 5', or 'Off'.
+String _aiLine(AppState s) {
+  final cfg = s.ai.features[aiMealPhoto];
+  if (cfg == null || !cfg.isOn || cfg.provider == null) return t('Off');
+  final name = aiProviderName[cfg.provider] ?? cfg.provider!;
+  final model = modelFor(cfg.provider!, cfg.model);
+  return model == null ? name : '$name · ${model.label}';
 }
 
-/// The workout-day reminder.
+/// 'Dark' or 'Light' — the one thing about the look you can tell from a word.
+String _appearanceLine(AppState s) => s.theme == 'light' ? t('Light') : t('Dark');
+
+/// '90s · RIR', or the rest alone when the effort column is off.
+///
+/// The summary a row has to earn its chevron with: both halves are things you set once and then
+/// want to check, not change.
+String _workoutLine(AppState s) {
+  final rest = '${s.restSec.toInt()}s';
+  final effort = effortOf(s);
+  return effort == 'none' ? rest : '$rest · ${t(effort.toUpperCase())}';
+}
+
+/// How a session behaves, and when the app asks you to have one.
 ///
 /// The schedule itself is resynced by the app whenever the plan or the time changes; this
 /// section only owns the OS permission prompt, which belongs to the moment the switch is
 /// turned on and nowhere else.
-class ReminderSection extends ConsumerWidget {
-  const ReminderSection({super.key, required this.state});
+class WorkoutsSection extends ConsumerWidget {
+  const WorkoutsSection({super.key, required this.state});
 
   final AppState state;
 
@@ -350,9 +198,17 @@ class ReminderSection extends ConsumerWidget {
     }
 
     return Section(
-      title: t('Notifications'),
+      title: t('Workouts'),
       footer: on ? t('Reminds you at this time on days that have a routine planned.') : null,
       children: [
+        AppRow(
+          icon: 'timer',
+          iconTint: c.sys.orange,
+          title: t('During a workout'),
+          value: _workoutLine(state),
+          accessory: RowAccessory.chevron,
+          onTap: () => context.go('/settings/workout'),
+        ),
         AppRow(
           icon: 'calendar',
           iconTint: c.sys.orange,
@@ -387,40 +243,4 @@ class ReminderSection extends ConsumerWidget {
       ],
     );
   }
-}
-
-/// Hand the whole training log to the OS share sheet.
-Future<void> exportBackup(WidgetRef ref) async {
-  try {
-    await Backup.export(ref.read(appStateProvider));
-    ref.read(uiProvider).toast(t('Backup exported'));
-  } catch (_) {
-    // The share sheet was dismissed — not a failure worth reporting.
-  }
-}
-
-/// Replace everything with a backup file.
-///
-/// Wholesale, not merged, and confirmed first: an import is the one action where "just try it"
-/// is expensive, because what it overwrites is someone's entire training history.
-Future<void> importBackupFile(WidgetRef ref) async {
-  final raw = await Backup.pickText(['json']);
-  if (raw == null) return;
-  final AppState next;
-  try {
-    next = Backup.parse(raw);
-  } catch (e) {
-    ref.read(uiProvider).toast(t('Import failed: {0}', 'not an openGym backup'));
-    return;
-  }
-  confirmSheet(
-    title: t('Import backup?'),
-    message: t('This replaces all current data with the backup file.'),
-    confirmText: t('Import'),
-    danger: true,
-    onConfirm: () {
-      ref.read(appStateProvider.notifier).replaceState(next);
-      ref.read(uiProvider).toast(t('Backup imported'));
-    },
-  );
 }

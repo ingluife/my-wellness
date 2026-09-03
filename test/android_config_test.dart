@@ -12,6 +12,13 @@ void main() {
   final gradle = File('android/app/build.gradle.kts').readAsStringSync();
   final manifest = File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
 
+  /// The manifest with its comments stripped.
+  ///
+  /// Needed for any assertion about a permission being *absent*: this file explains at length
+  /// why CAMERA must not be declared, and naming it in that explanation is not the same as
+  /// declaring it. A bare text search cannot tell the two apart.
+  final declared = manifest.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
+
   String? valueOf(String key) =>
       RegExp('$key\\s*=\\s*"([^"]+)"').firstMatch(gradle)?.group(1);
 
@@ -59,8 +66,20 @@ void main() {
       'RECEIVE_BOOT_COMPLETED',
       'VIBRATE',
       'WAKE_LOCK',
+      // Meal photos. The only reason this app touches the network at all.
+      'INTERNET',
     ]) {
       expect(manifest, contains('android.permission.$p'), reason: p);
     }
+  });
+
+  test('CAMERA is not declared, and must not be', () {
+    // The more valuable of the two assertions, because it encodes something nobody has otherwise:
+    // image_picker takes photos through ACTION_IMAGE_CAPTURE, which needs no permission — but
+    // declaring CAMERA anyway makes Android require it to be *granted* before that intent will
+    // start, so the capture throws for a permission the app never prompts for. "It takes photos,
+    // surely it needs CAMERA" is exactly the change this test exists to stop.
+    expect(declared, isNot(contains('android.permission.CAMERA')),
+        reason: 'declaring CAMERA breaks ACTION_IMAGE_CAPTURE rather than enabling it');
   });
 }

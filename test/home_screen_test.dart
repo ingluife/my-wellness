@@ -1,13 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/domain/exercises.dart';
-import 'package:my_open_gym/domain/format.dart';
-import 'package:my_open_gym/state/app_state_provider.dart';
-import 'package:my_open_gym/ui/app.dart';
-import 'package:my_open_gym/ui/widgets/controls/surfaces.dart';
-import 'package:my_open_gym/ui/widgets/line_chart.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/domain/exercises.dart';
+import 'package:my_wellness/domain/format.dart';
+import 'package:my_wellness/state/app_state_provider.dart';
+import 'package:my_wellness/ui/app.dart';
+import 'package:my_wellness/ui/widgets/controls/surfaces.dart';
+import 'package:my_wellness/ui/widgets/line_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -26,7 +26,7 @@ void main() {
     final container = ProviderContainer();
     if (initial != null) container.read(appStateProvider.notifier).replaceState(initial);
     await tester.pumpWidget(
-        UncontrolledProviderScope(container: container, child: const MyOpenGymApp()));
+        UncontrolledProviderScope(container: container, child: const MyWellnessApp()));
     if (settle) {
       await tester.pumpAndSettle();
     } else {
@@ -43,7 +43,11 @@ void main() {
     expect(find.text('Load starter plan (PPL)'), findsOneWidget);
     expect(
         find.textContaining('No entries yet — log your weight to start the curve'), findsOneWidget);
-    expect(find.text('0 week streak'), findsOneWidget);
+    // The streak used to be one sentence ('0 week streak'); it is a stat tile now, with the
+    // label and the number as separate widgets — this checks a fresh profile still reads as
+    // zero rather than as broken or missing data.
+    expect(find.text('Week streak'), findsOneWidget);
+    expect(find.text('0'), findsWidgets);
     container.dispose();
   });
 
@@ -85,7 +89,9 @@ void main() {
       ..targetW = 77;
     final container = await pump(tester, s);
 
-    expect(find.text('78.4'), findsOneWidget);
+    // Once on the weight curve's own headline, and once in the snapshot grid's "Body weight"
+    // tile, which renders its number apart from the unit so long values never need an ellipsis.
+    expect(find.text('78.4'), findsNWidgets(2));
     // The move since the previous weigh-in, as a magnitude with an arrow beside it.
     expect(find.text('1.6'), findsOneWidget);
     expect(find.byType(LineChart), findsOneWidget);

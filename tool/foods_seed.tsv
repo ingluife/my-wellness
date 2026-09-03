@@ -1,0 +1,275 @@
+# Curated food catalogue for the nutrition feature.
+#
+# One line per food. `id` is permanent: a logged meal stores it, so renumbering here would
+# silently repoint every meal ever logged at a different food. Add new foods at the end with
+# the next free id; never reorder or reuse one.
+#
+# `fdcId` is the USDA FoodData Central record the numbers come from (SR Legacy, public domain).
+# `name` is the display string and doubles as its i18n key. `cat` is one of
+# protein | dairy | carb | veg | fruit | fat | drink | other.
+#
+# The last field is the USDA description the id resolves to, kept so a wrong match is visible
+# in review rather than only in the app. gen_foods.mjs ignores it.
+#
+# The list is curated rather than filtered. SR Legacy holds 7,793 records, most of which are
+# brand-name products, restaurant dishes and 954 cuts of beef; a rules-only filter over it
+# produces a catalogue full of things nobody logs. These are the foods people actually eat.
+#
+# id	fdcId	name	cat	usda description
+f0001	174182	Anchovy	protein	Fish, anchovy, european, raw
+f0002	167914	Bacon	protein	Pork, cured, bacon, cooked, baked
+f0003	168607	Beef brisket	protein	Beef, brisket, whole, separable lean only, all grades, raw
+f0004	171206	Beef chuck	protein	Beef, chuck for stew, separable lean and fat, all grades, raw
+f0005	169451	Beef liver	protein	Beef, variety meats and by-products, liver, raw
+f0006	171209	Beef ribeye	protein	Beef, rib eye steak, boneless, lip-on, separable lean only, trimmed to 1/8" fat, all grades, cooked, grilled
+f0007	174055	Beef sirloin	protein	Beef, top sirloin, steak, separable lean only, trimmed to 1/8" fat, all grades, raw
+f0008	171812	Beef tenderloin	protein	Beef, tenderloin, steak, separable lean only, trimmed to 1/8" fat, all grades, raw
+f0009	175237	Black beans	protein	Beans, black, mature seeds, cooked, boiled, with salt
+f0010	171077	Chicken breast	protein	Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw
+f0011	171477	Chicken breast, roasted	protein	Chicken, broilers or fryers, breast, meat only, cooked, roasted
+f0012	173614	Chicken drumstick	protein	Chicken, broilers or fryers, dark meat, drumstick, meat only, raw
+f0013	173627	Chicken thigh	protein	Chicken, broilers or fryers, dark meat, thigh, meat only, raw
+f0014	173632	Chicken wing	protein	Chicken, broilers or fryers, wing, meat only, raw
+f0015	173799	Chickpeas	protein	Chickpeas (garbanzo beans, bengal gram), mature seeds, cooked, boiled, with salt
+f0016	174214	Clams	protein	Mollusks, clam, mixed species, raw
+f0017	171955	Cod	protein	Fish, cod, Atlantic, raw
+f0018	174204	Crab	protein	Crustaceans, crab, blue, raw
+f0019	171510	Duck breast	protein	Duck, young duckling, domesticated, White Pekin, breast, meat and skin, boneless, cooked, roasted
+f0020	168411	Edamame	protein	Edamame, frozen, prepared
+f0021	174776	Flank steak	protein	Beef, flank, steak, separable lean only, trimmed to 0" fat, all grades, raw
+f0022	174036	Ground beef	protein	Beef, ground, 80% lean meat / 20% fat, raw
+f0023	174030	Ground beef, lean	protein	Beef, ground, 90% lean meat / 10% fat, raw
+f0024	171116	Ground chicken	protein	Chicken, ground, raw
+f0025	167902	Ground pork	protein	Pork, fresh, ground, raw
+f0026	171505	Ground turkey	protein	Turkey, Ground, raw
+f0027	171964	Haddock	protein	Fish, haddock, raw
+f0028	171965	Halibut	protein	Fish, halibut, Greenland, raw
+f0029	167872	Ham	protein	Pork, cured, ham, boneless, regular (approximately 11% fat), roasted
+f0030	172454	Hummus	fat	Hummus, home prepared
+f0031	173792	Kidney beans	protein	Beans, kidney, all types, mature seeds, cooked, boiled, with salt
+f0032	172491	Lamb chop	protein	Lamb, loin, separable lean only, trimmed to 1/4" fat, choice, raw
+f0033	174370	Lamb, ground	protein	Lamb, ground, raw
+f0034	175254	Lentils	protein	Lentils, mature seeds, cooked, boiled, with salt
+f0035	174208	Lobster	protein	Crustaceans, lobster, northern, raw
+f0036	175119	Mackerel	protein	Fish, mackerel, Atlantic, raw
+f0037	174216	Mussels	protein	Mollusks, mussel, blue, raw
+f0038	173794	Navy beans	protein	Beans, navy, mature seeds, cooked, boiled, with salt
+f0039	174218	Octopus	protein	Mollusks, octopus, common, raw
+f0040	171978	Oysters	protein	Mollusks, oyster, eastern, wild, raw
+f0041	173796	Pinto beans	protein	Beans, pinto, mature seeds, cooked, boiled, with salt
+f0042	168251	Pork chop	protein	Pork, fresh, loin, top loin (chops), boneless, separable lean only, raw
+f0043	167907	Pork loin	protein	Pork, fresh, composite of trimmed retail cuts (loin and shoulder blade), separable lean only, raw
+f0044	168249	Pork tenderloin	protein	Pork, fresh, loin, tenderloin, separable lean only, raw
+f0045	174347	Rabbit	protein	Game meat, rabbit, wild, raw
+f0046	175167	Salmon, Atlantic	protein	Fish, salmon, Atlantic, farmed, raw
+f0047	173686	Salmon, wild	protein	Fish, salmon, Atlantic, wild, raw
+f0048	175139	Sardines	protein	Fish, sardine, Atlantic, canned in oil, drained solids with bone
+f0049	174220	Scallops	protein	Mollusks, scallop, mixed species, raw
+f0050	175142	Sea bass	protein	Fish, sea bass, mixed species, raw
+f0051	175179	Shrimp	protein	Crustaceans, shrimp, raw
+f0052	174299	Soybeans	protein	Soybeans, mature seeds, cooked, boiled, with salt
+f0053	175257	Split peas	protein	Peas, split, mature seeds, cooked, boiled, with salt
+f0054	174223	Squid	protein	Mollusks, squid, mixed species, raw
+f0055	173703	Swordfish	protein	Fish, swordfish, raw
+f0056	174272	Tempeh	protein	Tempeh
+f0057	175176	Tilapia	protein	Fish, tilapia, raw
+f0058	172475	Tofu, firm	protein	Tofu, raw, firm, prepared with calcium sulfate
+f0059	173717	Trout	protein	Fish, trout, rainbow, farmed, raw
+f0060	173706	Tuna, bluefin	protein	Fish, tuna, fresh, bluefin, raw
+f0061	173709	Tuna, canned in water	protein	Fish, tuna, light, canned in water, drained solids (Includes foods for USDA's Food Distribution Program)
+f0062	171098	Turkey breast	protein	Turkey, whole, breast, meat only, raw
+f0063	173826	Veal	protein	Veal, loin, separable lean only, raw
+f0064	173855	Venison	protein	Game meat, deer, raw
+f0065	175249	White beans	protein	Beans, white, mature seeds, cooked, boiled, with salt
+f0066	172177	Brie	dairy	Cheese, brie
+f0067	173414	Cheddar	dairy	Cheese, cheddar (Includes foods for USDA's Food Distribution Program)
+f0068	172182	Cottage cheese	dairy	Cheese, cottage, lowfat, 2% milkfat
+f0069	173418	Cream cheese	dairy	Cheese, cream
+f0070	172183	Egg white	dairy	Egg, white, raw, fresh
+f0071	172184	Egg yolk	dairy	Egg, yolk, raw, fresh
+f0072	171287	Egg, whole	dairy	Egg, whole, raw, fresh
+f0073	173420	Feta	dairy	Cheese, feta
+f0074	171241	Gouda	dairy	Cheese, gouda
+f0075	170894	Greek yogurt, plain	dairy	Yogurt, Greek, plain, nonfat (Includes foods for USDA's Food Distribution Program)
+f0076	170859	Heavy cream	dairy	Cream, fluid, heavy whipping
+f0077	170904	Kefir	dairy	Kefir, lowfat, plain, LIFEWAY
+f0078	171267	Milk, 2%	dairy	Milk, reduced fat, fluid, 2% milkfat, with added vitamin A and vitamin D
+f0079	169868	Milk, skim	dairy	Milk, fluid, nonfat, calcium fortified (fat free or skim)
+f0080	171265	Milk, whole	dairy	Milk, whole, 3.25% milkfat, with added vitamin D
+f0081	170847	Mozzarella	dairy	Cheese, mozzarella, part skim milk
+f0082	170848	Parmesan	dairy	Cheese, parmesan, hard
+f0083	171248	Ricotta	dairy	Cheese, ricotta, part skim milk
+f0084	171257	Sour cream	dairy	Cream, sour, cultured
+f0085	171251	Swiss cheese	dairy	Cheese, swiss
+f0086	170886	Yogurt, plain	dairy	Yogurt, plain, low fat
+f0087	174899	Bagel	carb	Bagels, plain, enriched, with calcium propionate (includes onion, poppy, sesame)
+f0088	170285	Barley	carb	Barley, pearled, cooked
+f0089	169704	Brown rice	carb	Rice, brown, long-grain, cooked (Includes foods for USDA's Food Distribution Program)
+f0090	170686	Buckwheat	carb	Buckwheat groats, roasted, cooked
+f0091	170287	Bulgur	carb	Bulgur, cooked
+f0092	169985	Cassava	carb	Cassava, raw
+f0093	175036	Corn tortilla	carb	Tortillas, ready-to-bake or -fry, corn
+f0094	168867	Cornmeal	carb	Cornmeal, degermed, enriched, yellow
+f0095	169700	Couscous	carb	Couscous, cooked
+f0096	168919	Egg noodles	carb	Noodles, egg, cooked, enriched, with added salt
+f0097	175063	English muffin	carb	English muffins, plain, enriched, without calcium propionate(includes sourdough)
+f0098	167535	Flour tortilla	carb	Tortillas, ready-to-bake or -fry, flour, shelf stable
+f0099	168930	Jasmine rice	carb	Rice, white, medium-grain, cooked, unenriched
+f0100	168871	Millet	carb	Millet, cooked
+f0101	173905	Oatmeal	carb	Cereals, oats, regular and quick, unenriched, cooked with water (includes boiling and microwaving), without salt
+f0102	173019	Oats	carb	Cereals ready-to-eat, POST, HONEY BUNCHES OF OATS, with real strawberries
+f0103	168928	Pasta	carb	Pasta, cooked, unenriched, without added salt
+f0104	174915	Pita bread	carb	Bread, pita, white, enriched
+f0105	168215	Plantain	carb	Plantains, green, raw
+f0106	167959	Popcorn	carb	Snacks, popcorn, air-popped
+f0107	170026	Potato	carb	Potatoes, flesh and skin, raw
+f0108	170112	Potato, baked	carb	Potatoes, baked, flesh, with salt
+f0109	168917	Quinoa	carb	Quinoa, cooked
+f0110	172684	Rye bread	carb	Bread, rye
+f0111	172675	Sourdough bread	carb	Bread, french or vienna (includes sourdough)
+f0112	168484	Sweet potato	carb	Sweet potato, cooked, boiled, without skin
+f0113	168894	Wheat flour	carb	Wheat flour, white, all-purpose, enriched, bleached
+f0114	174924	White bread	carb	Bread, white, commercially prepared (includes soft bread crumbs)
+f0115	169753	White rice	carb	Rice, white, long-grain, regular, cooked, enriched, with salt
+f0116	172688	Whole wheat bread	carb	Bread, whole-wheat, commercially prepared
+f0117	168910	Whole wheat pasta	carb	Pasta, whole-wheat, cooked (Includes foods for USDA's Food Distribution Program)
+f0118	169205	Artichoke	veg	Artichokes, (globe or french), raw
+f0119	169387	Arugula	veg	Arugula, raw
+f0120	168389	Asparagus	veg	Asparagus, raw
+f0121	169145	Beetroot	veg	Beets, raw
+f0122	170108	Bell pepper	veg	Peppers, sweet, red, raw
+f0123	170390	Bok choy	veg	Cabbage, chinese (pak-choi), raw
+f0124	170379	Broccoli	veg	Broccoli, raw
+f0125	170383	Brussels sprouts	veg	Brussels sprouts, raw
+f0126	169295	Butternut squash	veg	Squash, winter, butternut, raw
+f0127	169975	Cabbage	veg	Cabbage, raw
+f0128	170393	Carrot	veg	Carrots, raw
+f0129	169986	Cauliflower	veg	Cauliflower, raw
+f0130	169988	Celery	veg	Celery, raw
+f0131	170106	Chili pepper	veg	Peppers, hot chili, red, raw
+f0132	170406	Collard greens	veg	Collards, raw
+f0133	169225	Cucumber	veg	Cucumber, peeled, raw
+f0134	169228	Eggplant	veg	Eggplant, raw
+f0135	169230	Garlic	veg	Garlic, raw
+f0136	169961	Green beans	veg	Beans, snap, green, raw
+f0137	170419	Green peas	veg	Peas, green, raw
+f0138	169248	Iceberg lettuce	veg	Lettuce, iceberg (includes crisphead types), raw
+f0139	168421	Kale	veg	Kale, raw
+f0140	169246	Leek	veg	Leeks, (bulb and lower leaf-portion), raw
+f0141	169251	Mushroom	veg	Mushrooms, white, raw
+f0142	169260	Okra	veg	Okra, raw
+f0143	170000	Onion	veg	Onions, raw
+f0144	170417	Parsnip	veg	Parsnips, raw
+f0145	169255	Portobello mushroom	veg	Mushrooms, portabella, raw
+f0146	168448	Pumpkin	veg	Pumpkin, raw
+f0147	169276	Radish	veg	Radishes, raw
+f0148	169247	Romaine lettuce	veg	Lettuce, cos or romaine, raw
+f0149	169279	Sauerkraut	veg	Sauerkraut, canned, solids and liquids
+f0150	170496	Seaweed	veg	Seaweed, wakame, raw
+f0151	168462	Spinach	veg	Spinach, raw
+f0152	169998	Sweet corn	veg	Corn, sweet, yellow, raw
+f0153	169991	Swiss chard	veg	Chard, swiss, raw
+f0154	170457	Tomato	veg	Tomatoes, red, ripe, raw, year round average
+f0155	170050	Tomato, cooked	veg	Tomatoes, red, ripe, cooked
+f0156	170465	Turnip	veg	Turnips, raw
+f0157	170068	Watercress	veg	Watercress, raw
+f0158	169291	Zucchini	veg	Squash, summer, zucchini, includes skin, raw
+f0159	171688	Apple	fruit	Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)
+f0160	171697	Apricot	fruit	Apricots, raw
+f0161	173944	Banana	fruit	Bananas, raw
+f0162	173946	Blackberry	fruit	Blackberries, raw
+f0163	171711	Blueberry	fruit	Blueberries, raw
+f0164	169092	Cantaloupe	fruit	Melons, cantaloupe, raw
+f0165	171719	Cherry	fruit	Cherries, sweet, raw
+f0166	171722	Cranberry	fruit	Cranberries, raw
+f0167	168191	Dates	fruit	Dates, medjool
+f0168	173021	Fig	fruit	Figs, raw
+f0169	174676	Grapefruit	fruit	Grapefruit, raw, white, all areas
+f0170	174683	Grapes	fruit	Grapes, red or green (European type, such as Thompson seedless), raw
+f0171	169911	Honeydew	fruit	Melons, honeydew, raw
+f0172	168153	Kiwi	fruit	Kiwifruit, green, raw
+f0173	167746	Lemon	fruit	Lemons, raw, without peel
+f0174	168155	Lime	fruit	Limes, raw
+f0175	169910	Mango	fruit	Mangos, raw
+f0176	169914	Nectarine	fruit	Nectarines, raw
+f0177	169097	Orange	fruit	Oranges, raw, all commercial varieties
+f0178	169926	Papaya	fruit	Papayas, raw
+f0179	169928	Peach	fruit	Peaches, yellow, raw
+f0180	169118	Pear	fruit	Pears, raw
+f0181	169124	Pineapple	fruit	Pineapple, raw, all varieties
+f0182	169949	Plum	fruit	Plums, raw
+f0183	169134	Pomegranate	fruit	Pomegranates, raw
+f0184	168164	Raisins	fruit	Raisins, golden, seedless
+f0185	167755	Raspberry	fruit	Raspberries, raw
+f0186	167762	Strawberry	fruit	Strawberries, raw
+f0187	167765	Watermelon	fruit	Watermelon, raw
+f0188	168603	Almond butter	fat	Nuts, almond butter, plain, with salt added
+f0189	170567	Almonds	fat	Nuts, almonds
+f0190	171705	Avocado	fat	Avocados, raw, all commercial varieties
+f0191	170569	Brazil nuts	fat	Nuts, brazilnuts, dried, unblanched
+f0192	173410	Butter	fat	Butter, salted
+f0193	172336	Canola oil	fat	Oil, canola
+f0194	170162	Cashews	fat	Nuts, cashew nuts, raw
+f0195	170554	Chia seeds	fat	Seeds, chia seeds, dried
+f0196	170169	Coconut meat	fat	Nuts, coconut meat, raw
+f0197	171412	Coconut oil	fat	Oil, coconut
+f0198	169414	Flaxseed	fat	Seeds, flaxseed
+f0199	170581	Hazelnuts	fat	Nuts, hazelnuts or filberts
+f0200	170178	Macadamia	fat	Nuts, macadamia nuts, raw
+f0201	171009	Mayonnaise	fat	Salad dressing, mayonnaise, regular
+f0202	171413	Olive oil	fat	Oil, olive, salad or cooking
+f0203	169094	Olives	fat	Olives, ripe, canned (small-extra large)
+f0204	174294	Peanut butter	fat	Peanut Butter, smooth (Includes foods for USDA's Food Distribution Program)
+f0205	171410	Peanut oil	fat	Oil, peanut, salad or cooking
+f0206	172430	Peanuts	fat	Peanuts, all types, raw
+f0207	170182	Pecans	fat	Nuts, pecans
+f0208	170184	Pistachios	fat	Nuts, pistachio nuts, raw
+f0209	170557	Pumpkin seeds	fat	Seeds, pumpkin and squash seed kernels, roasted, without salt
+f0210	171016	Sesame oil	fat	Oil, sesame, salad or cooking
+f0211	170150	Sesame seeds	fat	Seeds, sesame seeds, whole, dried
+f0212	171017	Sunflower oil	fat	Oil, sunflower, linoleic (less than 60%)
+f0213	170562	Sunflower seeds	fat	Seeds, sunflower seed kernels, dried
+f0214	169410	Tahini	fat	Seeds, sesame butter, tahini, from raw and stone ground kernels
+f0215	170187	Walnuts	fat	Nuts, walnuts, english
+f0216	174832	Almond milk	drink	Beverages, almond milk, unsweetened, shelf stable
+f0217	167771	Apple juice	drink	Apple juice, canned or bottled, unsweetened, with added ascorbic acid
+f0218	168746	Beer	drink	Alcoholic beverage, beer, regular, all
+f0219	173227	Black tea	drink	Beverages, tea, black, brewed, prepared with tap water
+f0220	170172	Coconut water	drink	Nuts, coconut milk, raw (liquid expressed from grated meat and water)
+f0221	171890	Coffee	drink	Beverages, coffee, brewed, prepared with tap water
+f0222	174852	Cola	drink	Beverages, carbonated, cola, regular
+f0223	171917	Green tea	drink	Beverages, tea, green, brewed, regular
+f0224	169098	Orange juice	drink	Orange juice, raw (Includes foods for USDA's Food Distribution Program)
+f0225	173190	Red wine	drink	Alcoholic beverage, wine, table, red
+f0226	175215	Soy milk	drink	Soymilk (all flavors), unsweetened, with added calcium, vitamins A and D
+f0227	169640	Honey	carb	Honey
+f0228	169641	Jam	carb	Jams and preserves
+f0229	170054	Tomato sauce	veg	Tomato products, canned, sauce
+f0230	174277	Soy sauce	other	Soy sauce made from soy and wheat (shoyu)
+f0231	170273	Dark chocolate	fat	Chocolate, dark, 70-85% cacao solids
+f0232	173859	Chorizo	protein	Sausage, pork, chorizo, link or ground, raw
+f0233	174524	Salsa	veg	Sauce, salsa, ready-to-serve
+f0234	172442	Miso	other	Miso
+f0235	168914	Rice noodles	carb	Rice noodles, cooked
+f0236	172952	Italian sausage	protein	Sausage, Italian, sweet, links
+f0237	170051	Canned tomatoes	veg	Tomatoes, red, ripe, canned, packed in tomato juice
+f0238	170775	Strawberry banana smoothie	drink	Fast foods, strawberry banana smoothie made with ice and low-fat yogurt
+f0239	170883	Chocolate milkshake	drink	Milk shakes, thick chocolate
+f0240	170884	Vanilla milkshake	drink	Milk shakes, thick vanilla
+f0241	171871	Root beer	drink	Beverages, carbonated, root beer
+f0242	173205	Lemon-lime soda	drink	Beverages, carbonated, lemon-lime soda, no caffeine
+f0243	174846	Ginger ale	drink	Beverages, carbonated, ginger ale
+f0244	174906	Banana bread	carb	Bread, banana, prepared from recipe, made with margarine
+f0245	174987	Croissant	carb	Croissants, butter
+f0246	172798	Cinnamon roll	carb	Sweet rolls, cinnamon, refrigerated dough with frosting
+f0247	172753	Danish pastry	carb	Danish pastry, cinnamon, enriched
+f0248	174992	Glazed doughnut	carb	Doughnuts, cake-type, plain, sugared or glazed
+f0249	172716	Chocolate chip cookie	carb	Cookies, chocolate chip, commercially prepared, regular, higher fat, enriched
+f0250	172713	Brownie	carb	Cookies, brownies, commercially prepared
+f0251	167575	Vanilla ice cream	dairy	Ice creams, vanilla
+f0252	169677	Potato chips	fat	Snacks, potato chips, plain, salted
+f0253	170697	Onion rings	fat	Fast foods, onion rings, breaded and fried
+f0254	170317	Cheese pizza	other	Pizza, cheese topping, regular crust, frozen, cooked
+f0255	170693	Hamburger	other	Fast foods, hamburger; single, regular patty; plain
+f0256	170691	Cheeseburger	other	Fast foods, cheeseburger; single, regular patty, with condiments
+f0257	171633	Hot dog	other	Frankfurter, meat and poultry, cooked, boiled

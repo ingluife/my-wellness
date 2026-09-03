@@ -1,0 +1,445 @@
+{
+  "unit": "lb",
+  "restSec": 120,
+  "sound": false,
+  "keepAwake": false,
+  "lang": "es",
+  "theme": "light",
+  "accent": "violet",
+  "body": "female",
+  "targetW": 77.5,
+  "bodyweight": [
+    {
+      "d": "2026-08-01",
+      "w": 82.4,
+      "t": 1754035200000
+    },
+    {
+      "d": "2026-08-08",
+      "w": 81,
+      "t": 1754640000000
+    },
+    {
+      "d": "2026-08-15",
+      "w": 80.6
+    }
+  ],
+  "routines": [
+    {
+      "id": "r1",
+      "name": "Push Day",
+      "emoji": "barbell",
+      "prog": "greyskull",
+      "ex": [
+        {
+          "id": "0025",
+          "sets": 4,
+          "reps": 8,
+          "weight": 60,
+          "mode": "reps",
+          "inc": 2.5
+        },
+        {
+          "id": "0047",
+          "sg": "sgA",
+          "sets": 3,
+          "reps": 10,
+          "weight": 45,
+          "mode": "reps",
+          "prog": "double",
+          "repsMin": 8
+        },
+        {
+          "id": "0251",
+          "sg": "sgA",
+          "sets": 3,
+          "reps": 12,
+          "weight": 0,
+          "mode": "reps",
+          "bodyweight": true,
+          "repsMax": 20
+        },
+        {
+          "id": "0334",
+          "sets": 3,
+          "reps": 16,
+          "weight": 10,
+          "mode": "reps",
+          "side": true
+        },
+        {
+          "id": "3298",
+          "sets": 3,
+          "sec": 45,
+          "weight": 0,
+          "mode": "time",
+          "bodyweight": true,
+          "prog": "time",
+          "inc": 5
+        },
+        {
+          "id": "0685",
+          "sets": 2,
+          "min": 20,
+          "speed": 8.5
+        }
+      ]
+    },
+    {
+      "id": "r2",
+      "name": "Rest-ish",
+      "emoji": "\ud83d\udcaa",
+      "ex": []
+    }
+  ],
+  "week": {
+    "1": "r1",
+    "3": "r1",
+    "5": "r2"
+  },
+  "dayPlan": {
+    "2026-08-19": "r2",
+    "2026-08-20": "rest"
+  },
+  "exWeights": {
+    "0025": {
+      "w": 62.5,
+      "d": "2026-08-17"
+    },
+    "0047": {
+      "w": 47.5,
+      "d": "2026-08-17"
+    }
+  },
+  "workouts": [
+    {
+      "id": "w1",
+      "d": "2026-08-17",
+      "start": 1755424800000,
+      "end": 1755430200000,
+      "routineId": "r1",
+      "name": "Push Day",
+      "bw": 80.9,
+      "vol": 7535.5,
+      "prs": [
+        "0025"
+      ],
+      "entries": [
+        {
+          "id": "0025",
+          "target": {
+            "sets": 4,
+            "reps": 8,
+            "weight": 60,
+            "mode": "reps"
+          },
+          "topW": 62.5,
+          "sets": [
+            {
+              "w": 60,
+              "r": 8,
+              "done": true,
+              "rir": 2
+            },
+            {
+              "w": 62.5,
+              "r": 8,
+              "done": true,
+              "rir": 1.5
+            },
+            {
+              "w": 62.5,
+              "r": 7,
+              "done": true,
+              "rir": 0
+            },
+            {
+              "w": 62.5,
+              "r": 6,
+              "done": false
+            }
+          ]
+        },
+        {
+          "id": "0251",
+          "target": {
+            "sets": 3,
+            "reps": 12,
+            "weight": 0,
+            "mode": "reps",
+            "bodyweight": true,
+            "repsMax": 20
+          },
+          "topW": null,
+          "sets": [
+            {
+              "w": 0,
+              "r": 12,
+              "done": true,
+              "rpe": 8
+            },
+            {
+              "w": 0,
+              "r": 12,
+              "done": true,
+              "rpe": 9.5
+            }
+          ]
+        },
+        {
+          "id": "3298",
+          "target": {
+            "sets": 3,
+            "sec": 45,
+            "weight": 0,
+            "mode": "time",
+            "bodyweight": true
+          },
+          "topW": null,
+          "sets": [
+            {
+              "sec": 45,
+              "w": 0,
+              "done": true
+            },
+            {
+              "sec": 38,
+              "w": 0,
+              "done": true
+            }
+          ]
+        },
+        {
+          "id": "0685",
+          "target": {
+            "sets": 1,
+            "min": 20,
+            "speed": 8.5
+          },
+          "topW": null,
+          "sets": [
+            {
+              "min": 22,
+              "speed": 9,
+              "done": true
+            }
+          ]
+        },
+        {
+          "id": "cdeleted1",
+          "n": "Sandbag carry",
+          "target": {
+            "sets": 2,
+            "reps": 10,
+            "weight": 40,
+            "mode": "reps"
+          },
+          "topW": 40,
+          "sets": [
+            {
+              "w": 40,
+              "r": 10,
+              "done": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "active": {
+    "id": "a1",
+    "d": "2026-08-24",
+    "start": 1756029600000,
+    "routineId": "r1",
+    "name": "Push Day",
+    "bw": 80.6,
+    "cur": 0,
+    "entries": [
+      {
+        "id": "0025",
+        "target": {
+          "sets": 4,
+          "reps": 8,
+          "weight": 62.5,
+          "mode": "reps"
+        },
+        "plan": {
+          "policy": "greyskull",
+          "kind": "up",
+          "weight": 65,
+          "why": [
+            "Every rep last time \u2014 {0} {1} more.",
+            2.5,
+            "lb"
+          ]
+        },
+        "asked": true,
+        "topW": 65,
+        "sets": [
+          {
+            "w": 65,
+            "r": 8,
+            "done": true,
+            "rir": 2
+          },
+          {
+            "w": 65,
+            "r": 8,
+            "done": false
+          }
+        ]
+      },
+      {
+        "id": "0047",
+        "sg": "sgA",
+        "target": {
+          "sets": 3,
+          "reps": 10,
+          "weight": 45,
+          "mode": "reps",
+          "prog": "double",
+          "repsMin": 8
+        },
+        "plan": {
+          "policy": "double",
+          "kind": "hold",
+          "weight": 45,
+          "reps": 9,
+          "why": [
+            "Same weight \u2014 aim for {0} reps this time.",
+            9
+          ]
+        },
+        "sets": [
+          {
+            "w": 45,
+            "r": 9,
+            "done": false
+          }
+        ]
+      }
+    ]
+  },
+  "customEx": [
+    {
+      "id": "c1",
+      "n": "Sled push",
+      "bp": "upper legs",
+      "desc": "Heavy, 20 m turns.",
+      "tg": "",
+      "eq": "custom",
+      "custom": true
+    }
+  ],
+  "gifSize": "mini",
+  "reminder": {
+    "on": true,
+    "time": "07:30",
+    "tz": "Europe/Madrid"
+  },
+  "effort": "rpe",
+  "showRir": true,
+  "nutrition": {
+    "profile": {
+      "age": 34,
+      "height": 178,
+      "sex": "male",
+      "activity": "light"
+    },
+    "goal": {
+      "mode": "cut",
+      "rate": -0.5,
+      "fatPct": 25,
+      "meals": 4
+    },
+    "templates": [
+      {
+        "id": "mt1",
+        "n": "Usual breakfast",
+        "items": [
+          {
+            "fid": "f0072",
+            "g": 150,
+            "kcal": 215,
+            "p": 18.9,
+            "c": 1.1,
+            "f": 14.3
+          },
+          {
+            "fid": "f0100",
+            "g": 80,
+            "kcal": 305,
+            "p": 10.7,
+            "c": 53.8,
+            "f": 5.3
+          }
+        ],
+        "used": 12,
+        "last": 1740900000000
+      },
+      {
+        "id": "mt2",
+        "n": "Post-workout",
+        "items": [
+          {
+            "fid": "f0010",
+            "g": 200,
+            "kcal": 240,
+            "p": 45,
+            "c": 0,
+            "f": 5.2
+          }
+        ]
+      }
+    ],
+    "dismissedAdj": 1741000000000
+  },
+  "meals": [
+    {
+      "id": "m1",
+      "d": "2026-03-02",
+      "t": 1740900000000,
+      "slot": 0,
+      "items": [
+        {
+          "fid": "f0142",
+          "g": 180,
+          "kcal": 216,
+          "p": 40.5,
+          "c": 0,
+          "f": 4.7
+        },
+        {
+          "n": "flat white",
+          "g": 220,
+          "kcal": 120,
+          "p": 6.4,
+          "c": 9.1,
+          "f": 6.2
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "d": "2026-03-02",
+      "items": [
+        {
+          "fid": "f0301",
+          "g": 250,
+          "kcal": 325,
+          "p": 6.8,
+          "c": 70.5,
+          "f": 1.2
+        }
+      ]
+    }
+  ],
+  "_ts": 1756029600123,
+  "somethingFromANewerBuild": {
+    "keep": [
+      "me",
+      1,
+      true
+    ]
+  }
+}

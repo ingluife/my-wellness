@@ -9,6 +9,7 @@ import '../../domain/format.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
 import '../../domain/muscles.dart';
+import '../../domain/nutrition.dart';
 import '../../domain/onerm.dart';
 import '../../state/app_state_provider.dart';
 import '../sheets/calendar_sheet.dart';
@@ -24,6 +25,7 @@ import '../widgets/controls/surfaces.dart';
 import '../widgets/controls/toggles.dart';
 import '../widgets/heatmap.dart';
 import '../widgets/line_chart.dart';
+import '../widgets/macro_bar.dart';
 import '../widgets/page.dart';
 import 'routine_edit_screen.dart' show MuscleChip;
 
@@ -62,14 +64,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         StatTiles(
           icons: const ['dumbbell', 'calendar', 'flame', 'scale'],
           tiles: [
-            (label: t('Workouts'), value: '${s.workouts.length}', color: null),
-            (label: t('This month'), value: '$monthW', color: null),
-            (label: t('Week streak'), value: '${streakWeeks(s)}', color: null),
+            (label: t('Workouts'), value: '${s.workouts.length}', unit: null, color: null),
+            (label: t('This month'), value: '$monthW', unit: null, color: null),
+            (label: t('Week streak'), value: '${streakWeeks(s)}', unit: null, color: null),
             (
               label: t('Weight 30d'),
-              value: bwDelta30 == null
-                  ? '—'
-                  : '${bwDelta30 > 0 ? '+' : ''}${fmtNum(bwDelta30)} ${s.unit}',
+              value: bwDelta30 == null ? '—' : '${bwDelta30 > 0 ? '+' : ''}${fmtNum(bwDelta30)}',
+              unit: bwDelta30 == null ? null : s.unit,
               color: bwDelta30 == null
                   ? null
                   : bwDeltaColor(context, bwDelta30, lastBW(s)?.w ?? 0, s.targetW),
@@ -99,6 +100,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         if (s.workouts.isNotEmpty) MuscleBalanceCard(state: s),
         if (hasEffort(s)) EffortCard(state: s),
         _bodyWeightCard(context, s, now),
+        if (s.meals.isNotEmpty) NutritionCard(state: s),
         _exerciseProgressCard(context, s),
         if (s.workouts.isNotEmpty) ...[
           Row(children: [
@@ -695,6 +697,118 @@ class _EffortCardState extends State<EffortCard> {
           ],
         ],
       ),
+    );
+  }
+}
+
+
+/// What the food log says, and whether the scale agrees with it.
+///
+/// The second half is the one worth having. Everything upstream — a BMR equation, a MET table
+/// inferred from a body part, a portion size somebody eyeballed — is an estimate, and a screen
+/// that showed only the prediction would be asking to be believed. Showing the residual against
+/// the scale turns the whole feature into something that can be checked, and tells the user the
+/// only thing that actually generalises: whether these numbers run high or low for them.
+class NutritionCard extends StatelessWidget {
+  const NutritionCard({super.key, required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final s = state;
+    final iso = todayISO();
+    final week = weekTotals(s, iso);
+    final target = macroTargets(s, iso: iso);
+    final ev = evolution(s);
+
+    // One point per day that has any food on it, over the last 90 days.
+    final days = <String>{for (final m in s.meals) m.d}.toList()..sort();
+    final cutoff = DateTime.now().subtract(const Duration(days: 90));
+    final points = <ChartPoint>[
+      for (final d in days)
+        if (!dayOf(d).isBefore(cutoff))
+          ChartPoint(t: dayOf(d).millisecondsSinceEpoch, y: dayTotals(s, d).kcal, d: d),
+    ];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionTitle(t('Nutrition')),
+          if (points.isNotEmpty)
+            LineChart(
+              points: points,
+              height: 150,
+              unit: t('kcal'),
+              goal: target?.kcal,
+            ),
+          const SizedBox(height: 14),
+          Text(t('This week'), style: ts(TypeScale.foot, color: c.label2)),
+          const SizedBox(height: 6),
+          MacroLegend(macros: week),
+          if (ev != null) ...[
+            const SizedBox(height: 16),
+            Container(height: R.hair, color: c.sep),
+            const SizedBox(height: 14),
+            Text(t('Plan against scale'), style: ts(TypeScale.foot, color: c.label2)),
+            const SizedBox(height: 8),
+            _EvRow(
+              label: t('Your log predicted'),
+              value: '${_signed(ev.predicted)} kg',
+              tint: c.label,
+            ),
+            _EvRow(
+              label: t('The scale says'),
+              value: '${_signed(ev.observed)} kg',
+              tint: c.label,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _verdict(ev),
+              style: ts(TypeScale.cap, color: ev.reliable ? c.label2 : c.label3),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _signed(double v) =>
+      '${v > 0 ? '+' : v < 0 ? '-' : ''}${fmtNum(v.abs())}';
+
+  /// Says what the gap means in the only terms that are actionable.
+  static String _verdict(Evolution ev) {
+    if (!ev.reliable) {
+      return t('Keep logging — a fortnight of days and weigh-ins is about where this starts to mean anything.');
+    }
+    // Half a kilo over the window is inside what water alone moves.
+    if (ev.gap.abs() < 0.5) {
+      return t('Close enough. What you log and what you weigh are telling the same story.');
+    }
+    return ev.gap > 0
+        ? t('The scale is {0} kg above what your log predicted. Either some food is going unlogged, or the app is being generous about what you burn — lowering the target is the safer read.', fmtNum(ev.gap.abs()))
+        : t('You are {0} kg below what your log predicted. You are burning more than the app assumes, so there is room to eat a little more.', fmtNum(ev.gap.abs()));
+  }
+}
+
+class _EvRow extends StatelessWidget {
+  const _EvRow({required this.label, required this.value, required this.tint});
+
+  final String label;
+  final String value;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(children: [
+        Expanded(child: Text(label, style: ts(TypeScale.foot, color: c.label2))),
+        Text(value, style: ts(TypeScale.body, color: tint, weight: FontWeight.w600)),
+      ]),
     );
   }
 }

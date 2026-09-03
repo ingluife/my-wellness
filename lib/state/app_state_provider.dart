@@ -1,9 +1,14 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/app_state.dart';
+import '../data/repositories/meal_photo_store.dart';
 import '../data/repositories/state_repository.dart';
 import '../domain/exercises.dart';
+import '../domain/foods.dart';
 import '../domain/format.dart';
 import '../domain/i18n.dart';
 import '../platform/reminders.dart';
@@ -14,6 +19,20 @@ final stateRepositoryProvider = Provider<StateRepository>((ref) {
   ref.onDispose(repo.dispose);
   return repo;
 });
+
+/// Where meal photographs are kept. Beside the state repository rather than with the AI wiring,
+/// because it is storage the app owns and outlives any provider the photo was read by: a user who
+/// removes their API key still has the pictures of what they ate.
+final mealPhotoStoreProvider = Provider<MealPhotoStore>((ref) => FileMealPhotoStore());
+
+/// One meal's photograph, by file name.
+///
+/// A family so the framework caches it: a day of meals rebuilds on every keystroke of a stepper,
+/// and re-reading the same JPEGs off disk each time would be a scroll's worth of I/O for an image
+/// that has not changed. Null is the ordinary answer, not an error — see [Meal.photo].
+final mealPhotoProvider = FutureProvider.family<Uint8List?, String>(
+  (ref, name) => ref.watch(mealPhotoStoreProvider).read(name),
+);
 
 /// The whole app, as one object.
 ///
@@ -31,6 +50,7 @@ class AppStateController extends Notifier<AppState> {
   Future<void> boot() async {
     final s = await _repo.boot();
     Exercises.instance.registerCustom(s.customEx);
+    Foods.instance.registerCustom(s.nutrition.foods);
     await I18n.instance.setLang(s.lang);
 
     // Re-stamp the reminder's timezone on every launch — keeps it correct if you are
@@ -41,6 +61,27 @@ class AppStateController extends Notifier<AppState> {
     state = s;
     if (s.reminder.on) Reminders.instance.sync(s);
     ScreenWakeLock.instance.set(s.active != null && s.keepAwake);
+
+    // Housekeeping, and unawaited on purpose: deleting last quarter's photographs is never worth
+    // a frame of the first screen the user sees.
+    unawaited(sweepPhotos());
+  }
+
+  /// Drops the meal photographs the log no longer refers to, and the references to files that are
+  /// no longer there.
+  ///
+  /// Run at boot, and again the moment the setting is switched off — the same call, because
+  /// "keep none" is only a keep set with nothing in it. See [sweepMealPhotos].
+  Future<void> sweepPhotos() async {
+    final keep = state.ai.features[aiMealPhoto]?.keepsPhotos ?? true;
+    final drop = await sweepMealPhotos(ref.read(mealPhotoStoreProvider), state.meals,
+        keepPhotos: keep);
+    if (drop.isEmpty) return;
+    update((st) {
+      for (final m in st.meals) {
+        if (m.photo != null && drop.contains(m.photo)) m.photo = null;
+      }
+    });
   }
 
   /// Mutate a draft of the state, then persist it.
@@ -60,6 +101,7 @@ class AppStateController extends Notifier<AppState> {
   void _persist(AppState next) {
     next.ts = DateTime.now().millisecondsSinceEpoch;
     Exercises.instance.registerCustom(next.customEx);
+    Foods.instance.registerCustom(next.nutrition.foods);
     final before = state;
     state = next;
     _repo.save(next);

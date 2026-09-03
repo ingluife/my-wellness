@@ -1,0 +1,97 @@
+# Curated dish catalogue for the day planner.
+#
+# What this is for: the fortnight before a profile has any saved recipes of its own. The planner
+# always prefers the user's meals over these, and should — a recipe somebody wrote down is in
+# their words, made of food they buy. These exist so that day one is not a list of ingredients.
+#
+# Capped at sixty. Reshuffling has to stay interesting only until the recipe book fills up, and
+# every dish here costs eleven translations of its name.
+#
+# id	name	slots	cuisines	parts
+#
+# `id` is permanent the way a food id is. `slots` are lowercased names from `_splits` in
+# lib/domain/nutrition.dart. `cuisines` must match `_cuisines` in lib/domain/dishes.dart.
+#
+# A part is `fid:role:grams` with an optional fourth field, the step a `unit` moves in:
+#
+#   fixed   the cup of coffee, the splash of milk in it. Never resized.
+#   unit    slices, eggs, tortillas. Whole multiples of the step — two or three, never 2.4.
+#   flex    the anchor, and where protein is bought.
+#   accent  the cheese, the olives. Something you have a piece of, capped at twice the recipe.
+#   side    the salad, the vegetables. Where spare calories go.
+#   trace   the oil it was cooked in.
+#
+# The bands each role implies live in lib/domain/day_plan_source.dart, not here: one place to
+# change them, and no regeneration needed to do it. Grams are one honest serving of the dish as
+# written — the planner scales from there.
+#
+# Whole ingredients only. There is no stock, no spice and no vinegar in the food catalogue, and
+# a dish that leans on one would price out wrong. Seasoning is assumed, not listed.
+
+# — Breakfast —
+d0001	Ham and cheese sandwich	breakfast,snack	mediterranean,european	f0114:unit:58:29,f0029:flex:60,f0067:accent:28:28,f0154:side:40,f0202:trace:7,f0221:fixed:237
+d0002	Toast with butter and jam	breakfast	generic,european	f0114:unit:58:29,f0192:trace:10,f0228:accent:20:20,f0221:fixed:237
+d0003	Scrambled eggs on toast	breakfast	generic,european	f0072:unit:100:50,f0114:unit:58:29,f0192:trace:8,f0154:side:60,f0221:fixed:237
+d0004	Porridge with banana	breakfast	generic,european	f0102:flex:50,f0080:flex:250,f0161:side:118,f0227:trace:10
+d0005	Greek yogurt with berries and nuts	breakfast,snack	mediterranean,generic	f0075:flex:200,f0163:side:80,f0215:accent:20,f0227:trace:10
+d0006	Bagel with cream cheese and salmon	breakfast	generic,european	f0087:unit:105:105,f0069:accent:30,f0046:flex:60,f0119:side:20,f0221:fixed:237
+d0007	Toast with avocado and egg	breakfast	generic	f0116:unit:64:32,f0190:accent:60,f0072:unit:50:50,f0202:trace:5,f0221:fixed:237
+d0008	Tomato toast with olive oil	breakfast	mediterranean	f0111:flex:80,f0154:side:80,f0202:trace:10,f0029:accent:40,f0221:fixed:237
+d0009	Peanut butter toast with banana	breakfast,snack	generic	f0114:unit:58:29,f0204:accent:32:32,f0161:side:118,f0080:fixed:244
+d0010	Oats with milk and apple	breakfast	generic,european	f0102:flex:50,f0080:flex:250,f0159:side:150,f0189:accent:15
+d0011	Cottage cheese with fruit	breakfast,snack	european,generic	f0068:flex:200,f0179:side:150,f0195:trace:10,f0223:fixed:245
+d0012	Huevos rancheros	breakfast	latin	f0072:unit:100:50,f0093:unit:48:24,f0009:flex:80,f0233:side:50,f0190:accent:50
+d0013	Mushroom and spinach omelette	breakfast	generic,european	f0072:unit:100:50,f0141:side:80,f0151:side:60,f0085:accent:25,f0202:trace:7,f0221:fixed:237
+d0014	Congee with egg	breakfast	asian	f0115:flex:180,f0072:unit:50:50,f0123:side:70,f0210:trace:5,f0230:trace:8
+d0015	Menemen	breakfast	middleeastern	f0072:unit:100:50,f0122:side:90,f0154:side:120,f0073:accent:30,f0202:trace:10,f0219:fixed:237
+
+# — Lunch —
+d0016	Chicken, rice and salad	lunch,dinner	generic	f0010:flex:180,f0115:flex:158,f0148:side:80,f0154:side:60,f0202:trace:8
+d0017	Tuna salad sandwich	lunch	generic	f0114:unit:58:29,f0061:flex:100,f0201:trace:15,f0148:side:30,f0154:side:40
+d0018	Lentil soup with bread	lunch	mediterranean,middleeastern	f0034:flex:220,f0128:side:70,f0143:side:50,f0114:unit:29:29,f0202:trace:10
+d0019	Chickpea and feta salad	lunch	mediterranean	f0015:flex:180,f0073:accent:40,f0133:side:80,f0154:side:80,f0203:accent:20,f0202:trace:12
+d0020	Ham and cheese baguette	lunch	mediterranean	f0111:flex:100,f0029:flex:70,f0081:accent:40,f0154:side:50,f0202:trace:8
+d0021	Chicken burrito	lunch,dinner	latin	f0098:unit:98:49,f0010:flex:140,f0089:flex:120,f0009:side:70,f0233:side:40,f0067:accent:28:28
+d0022	Turkey and salad wrap	lunch	generic	f0098:unit:49:49,f0062:flex:120,f0148:side:50,f0154:side:50,f0190:accent:50,f0201:trace:12
+d0023	Pasta with tomato sauce	lunch,dinner	mediterranean	f0103:flex:220,f0229:side:150,f0082:accent:20,f0202:trace:10,f0135:trace:5
+d0024	Rice with beans and egg	lunch	latin	f0115:flex:180,f0009:flex:150,f0072:unit:50:50,f0105:side:80,f0202:trace:8
+d0025	Salmon poke bowl	lunch	asian	f0047:flex:120,f0115:flex:158,f0020:side:70,f0133:side:60,f0150:accent:10,f0210:trace:6,f0230:trace:10
+d0026	Chicken noodle stir-fry	lunch,dinner	asian	f0010:flex:150,f0235:flex:176,f0123:side:80,f0128:side:60,f0210:trace:8,f0230:trace:12
+d0027	Greek salad with pita	lunch	mediterranean	f0073:flex:80,f0133:side:120,f0154:side:120,f0203:accent:25,f0104:unit:60:60,f0202:trace:12
+d0028	Hummus and falafel plate	lunch	middleeastern	f0030:flex:120,f0015:flex:120,f0104:unit:60:60,f0154:side:70,f0133:side:60,f0214:trace:15
+d0029	Baked potato with tuna	lunch	european,generic	f0108:flex:213,f0061:flex:110,f0201:trace:15,f0152:side:60,f0067:accent:28:28
+d0030	Egg fried rice	lunch,dinner	asian	f0115:flex:200,f0072:unit:100:50,f0137:side:70,f0143:side:40,f0210:trace:8,f0230:trace:12
+d0031	Lentil and rice bowl	lunch,dinner	indian	f0034:flex:180,f0089:flex:150,f0151:side:80,f0143:side:40,f0197:trace:8
+d0032	Minestrone with bread	lunch	mediterranean	f0065:flex:160,f0128:side:60,f0158:side:70,f0229:side:120,f0111:flex:60,f0202:trace:10
+d0033	Chicken caesar salad	lunch	generic	f0010:flex:160,f0148:side:120,f0082:accent:20,f0114:unit:29:29,f0201:trace:20
+
+# — Dinner —
+d0034	Grilled salmon with potatoes	dinner	european,generic	f0046:flex:150,f0107:flex:200,f0120:side:100,f0202:trace:10,f0173:trace:10
+d0035	Roast chicken with vegetables	dinner	generic,european	f0011:flex:170,f0107:flex:200,f0128:side:80,f0124:side:80,f0202:trace:12
+d0036	Spaghetti bolognese	dinner	mediterranean	f0103:flex:200,f0023:flex:130,f0229:side:150,f0082:accent:15,f0202:trace:10
+d0037	Beef stir-fry with rice	dinner	asian	f0007:flex:150,f0115:flex:158,f0122:side:80,f0124:side:80,f0210:trace:8,f0230:trace:12
+d0038	Chicken curry with rice	dinner	indian	f0013:flex:160,f0089:flex:150,f0143:side:60,f0154:side:80,f0197:trace:10
+d0039	Tacos al pastor	dinner	latin	f0093:unit:72:24,f0043:flex:150,f0143:side:50,f0181:side:60,f0233:side:40,f0190:accent:50
+d0040	Baked cod with vegetables	dinner	mediterranean	f0017:flex:180,f0107:flex:180,f0158:side:100,f0154:side:70,f0202:trace:12
+d0041	Chilli con carne	dinner	latin	f0022:flex:150,f0031:flex:150,f0229:side:120,f0122:side:60,f0089:flex:120,f0202:trace:8
+d0042	Pork chop with sauerkraut	dinner	european	f0042:flex:170,f0149:side:120,f0107:flex:180,f0192:trace:10
+d0043	Mushroom risotto	dinner	mediterranean	f0115:flex:200,f0141:side:120,f0082:accent:20,f0192:trace:12,f0143:side:40
+d0044	Tofu and vegetable stir-fry	dinner	asian	f0058:flex:200,f0089:flex:150,f0123:side:80,f0122:side:70,f0210:trace:8,f0230:trace:12
+d0045	Shepherd's pie	dinner	european	f0023:flex:150,f0107:flex:220,f0128:side:70,f0137:side:60,f0192:trace:12
+d0046	Chicken shawarma plate	dinner	middleeastern	f0013:flex:160,f0091:flex:150,f0154:side:70,f0133:side:60,f0214:trace:15,f0104:unit:60:60
+d0047	Beef and barley stew	dinner	european	f0004:flex:160,f0088:flex:150,f0128:side:70,f0143:side:50,f0202:trace:10
+d0048	Grilled chicken with sweet potato	dinner	generic	f0010:flex:180,f0112:flex:200,f0125:side:90,f0202:trace:10
+d0049	Prawn and garlic pasta	dinner	mediterranean	f0051:flex:150,f0103:flex:180,f0135:trace:8,f0158:side:70,f0202:trace:14
+d0050	Chorizo and white bean stew	dinner	mediterranean	f0232:accent:60:60,f0065:flex:200,f0229:side:120,f0122:side:60,f0202:trace:8
+
+# — Snacks —
+d0051	Apple with peanut butter	snack	generic	f0159:side:182,f0204:accent:32:32
+d0052	Yogurt and honey	snack	mediterranean,generic	f0086:flex:170,f0227:trace:15,f0215:accent:15
+d0053	Hummus with vegetables	snack	middleeastern,mediterranean	f0030:flex:90,f0128:side:80,f0130:side:60,f0104:unit:28:28
+d0054	Cheese and crackers	snack	european,generic	f0067:accent:28:28,f0110:unit:50:25,f0170:side:80
+d0055	Handful of almonds and fruit	snack	generic	f0189:accent:30,f0177:side:131
+d0056	Boiled eggs with salt	snack	generic	f0072:unit:100:50,f0154:side:60
+d0057	Cottage cheese on rye	snack	european	f0068:flex:120,f0110:unit:32:32,f0133:side:50
+d0058	Banana and dark chocolate	snack	generic	f0161:side:118,f0231:accent:20
+d0059	Edamame and green tea	snack	asian	f0020:flex:150,f0223:fixed:245
+d0060	Tuna on crackers	snack	generic	f0061:flex:100,f0110:unit:50:25,f0154:side:40

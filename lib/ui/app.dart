@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import '../domain/format.dart';
 import '../domain/history.dart';
 import '../domain/i18n.dart';
+import '../state/ai_provider.dart';
 import '../state/app_state_provider.dart';
 import '../state/ui_provider.dart';
 import 'router.dart';
 import 'theme/app_colors.dart';
+import 'sheets/meal_photo_sheet.dart';
 import 'sheets/sheet_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/tokens.dart';
@@ -31,14 +35,14 @@ final uiProvider = Provider<UiController>((ref) {
 /// Theme and language are read straight out of the profile, so switching either repaints
 /// everything without a restart — the same thing the original does by re-rendering the whole
 /// shell when `data-theme`, `data-accent` or the language pack changes.
-class MyOpenGymApp extends ConsumerStatefulWidget {
-  const MyOpenGymApp({super.key});
+class MyWellnessApp extends ConsumerStatefulWidget {
+  const MyWellnessApp({super.key});
 
   @override
-  ConsumerState<MyOpenGymApp> createState() => _MyOpenGymAppState();
+  ConsumerState<MyWellnessApp> createState() => _MyWellnessAppState();
 }
 
-class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBindingObserver {
+class _MyWellnessAppState extends ConsumerState<MyWellnessApp> with WidgetsBindingObserver {
   late final GoRouter _router = buildRouter();
 
   @override
@@ -46,6 +50,9 @@ class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBinding
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     I18n.instance.addListener(_onLanguageChanged);
+    // Covers a cold start after the OS killed the app mid-picker: the first `resumed` callback
+    // is not guaranteed to fire, but the first frame always does.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPhoto());
   }
 
   @override
@@ -69,7 +76,21 @@ class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBinding
     }
     if (state == AppLifecycleState.resumed) {
       ref.read(uiProvider).resync(soundOn: ref.read(appStateProvider).sound);
+      _recoverLostPhoto();
     }
+  }
+
+  /// A meal photo taken right as Android reclaims memory can outlive the process that was
+  /// waiting for it: the camera still has the picture, but the pending `pickImage` future — and
+  /// the review sheet that was going to show it — died with the app. Every resume checks for
+  /// one, so the photo is not silently lost. It lands on today, unslotted: the sheet that knew
+  /// which day and slot it was headed for did not survive to say.
+  void _recoverLostPhoto() {
+    unawaited(ref.read(photoCaptureProvider).recoverLost().then((bytes) {
+      if (bytes != null && mounted) {
+        mealPhotoSheet(ref, iso: todayISO(), initialBytes: bytes);
+      }
+    }));
   }
 
   @override
@@ -83,14 +104,13 @@ class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBinding
     if (I18n.instance.lang != lang) I18n.instance.setLang(lang);
 
     return MaterialApp.router(
-      title: 'openGym',
+      title: 'My Wellness',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(
         theme == 'light' ? Brightness.light : Brightness.dark,
         accentFrom(accent),
       ),
       routerConfig: _router,
-      builder: (context, child) => AppShell(child: child ?? const SizedBox.shrink()),
     );
   }
 }
@@ -100,9 +120,13 @@ class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBinding
 /// They live outside the router so they survive navigation — checking Stats mid-rest must not
 /// stop the countdown, and the tab bar is always the way out of a screen that went wrong.
 class AppShell extends ConsumerWidget {
-  const AppShell({super.key, required this.child});
+  const AppShell({super.key, required this.child, required this.location});
 
   final Widget child;
+
+  /// The current path, handed down by the app rather than looked up here. See the comment on
+  /// the builder that supplies it.
+  final String location;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -116,7 +140,6 @@ class AppShell extends ConsumerWidget {
   }
 
   Widget _shell(BuildContext context, WidgetRef ref, UiController ui, bool active) {
-    final location = _locationOf(context);
     final timerShowing = ui.timer != null;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     // A Material ancestor, and the page's own background in one: text fields and anything else
@@ -139,7 +162,7 @@ class AppShell extends ConsumerWidget {
             right: 0,
             bottom: 0,
             child: AppTabBar(
-              current: location,
+              current: _tabKey,
               workoutRunning: active,
               onTap: (route) => appNavigatorKey.currentContext?.go(route),
               onStart: () => _start(context, ref, active),
@@ -177,9 +200,10 @@ class AppShell extends ConsumerWidget {
     appNavigatorKey.currentContext?.go('/workout');
   }
 
-  String _locationOf(BuildContext context) {
-    final path = GoRouter.maybeOf(context)?.state.uri.path ?? '/home';
-    final seg = path.split('/').where((s) => s.isNotEmpty);
+  /// The first path segment — 'nutrition' for `/nutrition/foods` as well as for `/nutrition`,
+  /// which is what lets a tab stay lit across its own child screens.
+  String get _tabKey {
+    final seg = location.split('/').where((s) => s.isNotEmpty);
     return seg.isEmpty ? 'home' : seg.first;
   }
 }

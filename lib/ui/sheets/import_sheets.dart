@@ -80,13 +80,13 @@ class _ImportSummary extends ConsumerWidget {
         const SizedBox(height: 12),
         StatTiles(tiles: [
           if (isBw) ...[
-            (label: t('Weigh-ins'), value: '${parsed.bodyweight.length}', color: null),
-            (label: t('New'), value: '$fresh', color: null),
+            (label: t('Weigh-ins'), value: '${parsed.bodyweight.length}', unit: null, color: null),
+            (label: t('New'), value: '$fresh', unit: null, color: null),
           ] else ...[
-            (label: t('Workouts'), value: '${parsed.workouts.length}', color: null),
-            (label: t('Sets'), value: '${parsed.sets}', color: null),
-            (label: t('Exercises matched'), value: '${parsed.matched}', color: null),
-            (label: t('Added as your own'), value: '${parsed.created}', color: null),
+            (label: t('Workouts'), value: '${parsed.workouts.length}', unit: null, color: null),
+            (label: t('Sets'), value: '${parsed.sets}', unit: null, color: null),
+            (label: t('Exercises matched'), value: '${parsed.matched}', unit: null, color: null),
+            (label: t('Added as your own'), value: '${parsed.created}', unit: null, color: null),
           ],
         ]),
         if (parsed.mixedUnits)

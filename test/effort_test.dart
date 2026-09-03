@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/domain/effort.dart';
-import 'package:my_open_gym/domain/format.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/domain/effort.dart';
+import 'package:my_wellness/domain/format.dart';
 
 /// Ported from openGym/frontend/src/lib/effort.test.js.
 void main() {

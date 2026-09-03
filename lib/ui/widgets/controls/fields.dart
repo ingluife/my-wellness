@@ -116,6 +116,184 @@ class _NumberFieldState extends State<NumberField> {
   }
 }
 
+/// A number you type, styled like the app's text input and sized to sit in a list row.
+///
+/// [NumberField] is the raw primitive underneath [AppStepper]: a bare `EditableText` with no
+/// background, no padding and no tap handling of its own. Inside a stepper that is exactly
+/// right — the ± buttons do the work and the field is only ever a readout. Standing alone in a
+/// row it is invisible and untappable, which is the gap this fills.
+///
+/// Use it wherever a number has to be typed rather than nudged: a calorie count, a height, a
+/// macro off a label. Where a value is being *adjusted* rather than entered, [AppStepper] is
+/// still the better control.
+class NumberBox extends StatefulWidget {
+  const NumberBox({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.decimal = true,
+    this.nullable = false,
+    this.placeholder,
+    this.suffix,
+    this.textAlign = TextAlign.end,
+    this.invalid = false,
+    this.max,
+  });
+
+  final double? value;
+  final ValueChanged<double?> onChanged;
+  final bool decimal;
+
+  /// Outlines the field in red. The message belongs beside the field, not in here — a red box
+  /// with no words is a scolding rather than an explanation.
+  final bool invalid;
+
+  /// A ceiling the field will not go above.
+  ///
+  /// Enforced as you type rather than checked afterwards: typing a fourth digit into an age
+  /// leaves it at the ceiling instead of accepting 999 and objecting later. There is
+  /// deliberately no matching floor — clamping upward would rewrite "1" to "13" while someone
+  /// was still on their way to typing "18", and a low value is better caught with a message.
+  final double? max;
+
+  /// An empty field reports null rather than zero — "not said" and "zero" are different
+  /// answers, and a profile with no age is not a newborn.
+  final bool nullable;
+
+  final String? placeholder;
+
+  /// A unit rendered inside the box, after the number: 'cm', 'g', 'kcal'.
+  final String? suffix;
+
+  final TextAlign textAlign;
+
+  @override
+  State<NumberBox> createState() => _NumberBoxState();
+}
+
+class _NumberBoxState extends State<NumberBox> {
+  late final TextEditingController _ctl = TextEditingController(text: _fmt(widget.value));
+  late final FocusNode _focus = FocusNode()..addListener(_onFocus);
+
+  /// What this field last reported, so a value coming back down can be told apart from an echo
+  /// of the user's own typing. Without it every keystroke would rewrite the draft underneath
+  /// them — the same guard [NumberField] carries.
+  double? _committed;
+
+  String _fmt(double? v) {
+    if (v == null) return '';
+    return v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+  }
+
+  void _onFocus() {
+    if (_focus.hasFocus) {
+      // Selecting the whole value on focus means typing replaces it, which is what you want
+      // when correcting a number rather than appending to one.
+      _ctl.selection = TextSelection(baseOffset: 0, extentOffset: _ctl.text.length);
+    } else {
+      _committed = null;
+      _ctl.text = _fmt(widget.value);
+    }
+    setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(NumberBox old) {
+    super.didUpdateWidget(old);
+    if (widget.value != _committed && widget.value != old.value) {
+      _committed = null;
+      _ctl.text = _fmt(widget.value);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _commit(String raw) {
+    var s = raw.replaceAll(',', '.').replaceAll(RegExp(r'[^0-9.]'), '');
+    final i = s.indexOf('.');
+    if (i != -1) {
+      s = widget.decimal
+          ? s.substring(0, i + 1) + s.substring(i + 1).replaceAll('.', '')
+          : s.substring(0, i);
+    }
+    var n = (s.isEmpty || s == '.')
+        ? (widget.nullable ? null : 0.0)
+        : (double.tryParse(s) ?? 0).clamp(0, double.infinity).toDouble();
+
+    final ceiling = widget.max;
+    if (n != null && ceiling != null && n > ceiling) {
+      n = ceiling;
+      s = _fmt(n);
+    }
+
+    _committed = n;
+    if (s != raw) {
+      _ctl.value =
+          TextEditingValue(text: s, selection: TextSelection.collapsed(offset: s.length));
+    }
+    widget.onChanged(n);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return AnimatedContainer(
+      duration: Motion.fast,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: c.surface2,
+        borderRadius: BorderRadius.circular(R.sm),
+        border: Border.all(
+          // Focus wins over the error colour while you are actually typing: a field turning
+          // red under the cursor mid-number, before you have finished saying it, is noise.
+          color: _focus.hasFocus
+              ? c.acc
+              : widget.invalid
+                  ? c.sys.red
+                  : c.surface2,
+          width: 2,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: TextField(
+              controller: _ctl,
+              focusNode: _focus,
+              onChanged: _commit,
+              textAlign: widget.textAlign,
+              keyboardType:
+                  TextInputType.numberWithOptions(decimal: widget.decimal, signed: false),
+              style: ts(TypeScale.body, color: c.label, weight: FontWeight.w500),
+              cursorColor: c.acc,
+              enableSuggestions: false,
+              autocorrect: false,
+              maxLines: 1,
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                hintText: widget.placeholder,
+                hintStyle: ts(TypeScale.body, color: c.label3),
+              ),
+            ),
+          ),
+          if (widget.suffix != null) ...[
+            const SizedBox(width: 4),
+            Text(widget.suffix!, style: ts(TypeScale.cap, color: c.label3)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// The app's text input. A filled surface with an accent focus ring — no underline, no
 /// floating label.
 class AppTextField extends StatefulWidget {
@@ -130,6 +308,7 @@ class AppTextField extends StatefulWidget {
     this.textAlign = TextAlign.start,
     this.style,
     this.textCapitalization = TextCapitalization.sentences,
+    this.obscureText = false,
   });
 
   final TextEditingController? controller;
@@ -141,6 +320,14 @@ class AppTextField extends StatefulWidget {
   final TextAlign textAlign;
   final TextStyle? style;
   final TextCapitalization textCapitalization;
+
+  /// Masks the text, and turns off autocorrect and suggestions with it.
+  ///
+  /// Only the AI settings screen sets this — an API key is the first and only secret the app
+  /// accepts. The suggestion strip matters as much as the masking here: a keyboard that learns
+  /// a 100-character key and later offers it as an autocomplete in another app has leaked it
+  /// just as surely as showing it on screen would.
+  final bool obscureText;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -176,7 +363,11 @@ class _AppTextFieldState extends State<AppTextField> {
         maxLines: widget.maxLines,
         autofocus: widget.autofocus,
         textAlign: widget.textAlign,
-        textCapitalization: widget.textCapitalization,
+        textCapitalization:
+            widget.obscureText ? TextCapitalization.none : widget.textCapitalization,
+        obscureText: widget.obscureText,
+        autocorrect: !widget.obscureText,
+        enableSuggestions: !widget.obscureText,
         textAlignVertical: area ? TextAlignVertical.top : null,
         style: widget.style ?? ts(TypeScale.body, color: c.label),
         cursorColor: c.acc,

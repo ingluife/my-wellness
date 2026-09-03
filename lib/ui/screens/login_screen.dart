@@ -34,7 +34,7 @@ class LoginScreen extends ConsumerWidget {
         SizedBox(height: MediaQuery.sizeOf(context).height * .18),
         Center(child: AppIcon('dumbbell', size: 54, color: c.acc)),
         const SizedBox(height: 10),
-        Text('myOpenGym',
+        Text('My Wellness',
             textAlign: TextAlign.center, style: ts(TypeScale.large, color: c.label)),
         const SizedBox(height: 4),
         Text(t('Your workouts. Your weights. Your profile.'),

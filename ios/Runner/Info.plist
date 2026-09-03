@@ -5,7 +5,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>myOpenGym</string>
+		<string>My Wellness</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>myOpenGym</string>
+		<string>My Wellness</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -47,5 +47,13 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Meal photos. iOS renders these strings itself in the permission prompt, so unlike
+		     every other string in the app they cannot go through t() — localising them means
+		     ios/Runner/<lang>.lproj/InfoPlist.strings. Known gap: the app ships 12 languages and
+		     these two stay English. No NSMicrophoneUsageDescription: stills only. -->
+		<key>NSCameraUsageDescription</key>
+		<string>Take a photo of a meal to work out what is in it.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Pick a photo of a meal to work out what is in it.</string>
 	</dict>
 </plist>

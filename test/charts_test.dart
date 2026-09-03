@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/ui/theme/app_theme.dart';
-import 'package:my_open_gym/ui/theme/tokens.dart';
-import 'package:my_open_gym/ui/widgets/heatmap.dart';
-import 'package:my_open_gym/ui/widgets/line_chart.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/ui/theme/app_theme.dart';
+import 'package:my_wellness/ui/theme/tokens.dart';
+import 'package:my_wellness/ui/widgets/heatmap.dart';
+import 'package:my_wellness/ui/widgets/line_chart.dart';
+import 'package:my_wellness/ui/widgets/macro_bar.dart';
 
 void main() {
   setUpAll(() async {
@@ -99,5 +100,59 @@ void main() {
     await tester.pumpWidget(host(Heatmap(state: AppState())));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  group('macros', () {
+    const target = (kcal: 2400.0, p: 160.0, c: 260.0, f: 67.0);
+
+    testWidgets('the ring paints under, at and over target, in both themes', (tester) async {
+      for (final b in Brightness.values) {
+        for (final eaten in [0.0, 1200.0, 2400.0, 3100.0]) {
+          await tester.pumpWidget(host(
+            KcalRing(eaten: eaten, target: target.kcal),
+            b: b,
+          ));
+          expect(tester.takeException(), isNull, reason: '$eaten in ${b.name}');
+        }
+      }
+    });
+
+    testWidgets('a zero target does not divide by it', (tester) async {
+      await tester.pumpWidget(host(const KcalRing(eaten: 500, target: 0)));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the bars paint with and without a target', (tester) async {
+      const eaten = (kcal: 1800.0, p: 120.0, c: 190.0, f: 52.0);
+      for (final b in Brightness.values) {
+        await tester.pumpWidget(host(
+          const MacroBars(eaten: eaten, target: target),
+          b: b,
+        ));
+        expect(tester.takeException(), isNull, reason: b.name);
+
+        // A day logged before a profile existed has totals but nothing to measure against.
+        await tester.pumpWidget(host(const MacroBars(eaten: eaten, target: null), b: b));
+        expect(tester.takeException(), isNull, reason: b.name);
+      }
+    });
+
+    testWidgets('the split handles an empty meal without a zero-width flex', (tester) async {
+      await tester.pumpWidget(
+          host(const MacroSplit(macros: (kcal: 0.0, p: 0.0, c: 0.0, f: 0.0))));
+      expect(tester.takeException(), isNull);
+
+      // Pure fat: two of the three segments are genuinely zero.
+      await tester.pumpWidget(
+          host(const MacroSplit(macros: (kcal: 900.0, p: 0.0, c: 0.0, f: 100.0))));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the legend paints in both themes', (tester) async {
+      for (final b in Brightness.values) {
+        await tester.pumpWidget(host(const MacroLegend(macros: target), b: b));
+        expect(tester.takeException(), isNull, reason: b.name);
+      }
+    });
   });
 }

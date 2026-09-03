@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/exercises.dart';
+import '../../domain/foods.dart';
 import '../../domain/i18n.dart';
 import '../../state/app_state_provider.dart';
 import '../theme/app_colors.dart';
@@ -154,6 +155,93 @@ class ExerciseThumb extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => Container(width: size, height: size, color: c.surface2),
       ),
+    );
+  }
+}
+
+/// The food equivalent of [ExerciseThumb].
+///
+/// Falls back to its category glyph rather than a hole. That is the normal case, not the edge
+/// one: the photographs are fetched by tool/sync_food_media.sh and git-ignored, so a fresh
+/// checkout has none of them and every list still has to look deliberate.
+class FoodThumb extends StatelessWidget {
+  const FoodThumb({super.key, required this.food, this.size = 50});
+
+  final Food food;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final glyph = foodCategoryGlyph[food.cat] ?? 'meal';
+
+    Widget fallback() => Container(
+          width: size,
+          height: size,
+          decoration:
+              BoxDecoration(color: c.surface2, borderRadius: BorderRadius.circular(9)),
+          alignment: Alignment.center,
+          child: AppIcon(glyph, size: size * .46, color: c.label2),
+        );
+
+    if (food.img == null) return fallback();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(9),
+      child: Image.asset(
+        'assets/food/${food.img}',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback(),
+      ),
+    );
+  }
+}
+
+/// The full-width photograph at the top of a food's detail sheet.
+class FoodImage extends StatelessWidget {
+  const FoodImage({super.key, required this.food, this.height = 170});
+
+  final Food food;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    if (food.img == null) return const SizedBox.shrink();
+    final credit = food.credit;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(R.lg),
+          child: Image.asset(
+            'assets/food/${food.img}',
+            width: double.infinity,
+            height: height,
+            fit: BoxFit.cover,
+            // An absent photo collapses the block entirely rather than leaving a grey slab:
+            // the sheet below it is the content, and a placeholder that size would be a lie
+            // about there being something to see.
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            frameBuilder: (_, child, frame, wasSync) => wasSync || frame != null
+                ? child
+                : Container(height: height, color: c.surface2),
+          ),
+        ),
+        if (credit != null)
+          Padding(
+            // Most of these photographs are CC-BY or CC-BY-SA. The credit has to travel with
+            // the picture, not sit in a file in the repository.
+            padding: const EdgeInsets.only(top: 5, left: 2),
+            child: Text(
+              t('Photo: {0}', credit),
+              style: ts(TypeScale.cap, color: c.label4),
+            ),
+          ),
+      ],
     );
   }
 }

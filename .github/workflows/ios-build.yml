@@ -26,8 +26,8 @@ jobs:
         # The build only needs the asset directories to exist; it does not care what is in
         # them, and pulling 137 MB to prove the Swift compiles is not a good trade.
         run: |
-          mkdir -p assets/img assets/gif
-          touch assets/img/.keep assets/gif/.keep
+          mkdir -p assets/img assets/gif assets/food
+          touch assets/img/.keep assets/gif/.keep assets/food/.keep
 
       - uses: subosito/flutter-action@v2
         with:

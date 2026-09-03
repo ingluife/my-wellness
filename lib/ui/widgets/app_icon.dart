@@ -3,6 +3,7 @@ import 'package:path_drawing/path_drawing.dart';
 import '../theme/tokens.dart';
 
 part 'icon_paths.dart';
+part 'icon_paths_food.dart';
 
 /// One shape of an icon, in the 24x24 source coordinate space.
 ///
@@ -31,9 +32,20 @@ final class IconRect extends IconShape {
   final double x, y, w, h, rx;
 }
 
+/// The generated openGym set plus the hand-drawn food glyphs, as one lookup.
+///
+/// Merged here rather than in either part file because icon_paths.dart is overwritten wholesale
+/// by tool/gen_icons.mjs — anything written there to join the two would not survive a
+/// regeneration. This file is hand-maintained, so the seam belongs in it.
+final _all = <String, List<IconShape>>{..._icons, ..._foodIcons};
+
 /// Every icon key, including the aliases. Used by `glyphOf()` to tell an icon key apart from
 /// a legacy emoji stored in `routine.emoji`.
-final iconNames = _icons.keys.toList(growable: false);
+final iconNames = _all.keys.toList(growable: false);
+
+/// Just the hand-drawn food glyphs. Split out so the two halves can be counted separately —
+/// a regeneration that silently dropped one set would otherwise only move a single total.
+final foodIconNames = _foodIcons.keys.toList(growable: false);
 
 /// Parsed paths are cached per key: the geometry never changes, and re-parsing ~10 path
 /// strings on every rebuild of a tab bar or a list row is pure waste.
@@ -41,7 +53,7 @@ final _cache = <String, List<(Path, bool)>>{};
 
 List<(Path, bool)> _shapesFor(String name) => _cache.putIfAbsent(name, () {
       final out = <(Path, bool)>[];
-      for (final s in _icons[name]!) {
+      for (final s in _all[name]!) {
         final p = switch (s) {
           IconPath(:final d) => parseSvgPathData(d),
           IconCircle(:final cx, :final cy, :final r) => Path()
@@ -86,7 +98,9 @@ class AppIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!_icons.containsKey(name)) return const SizedBox.shrink();
+    // `_all`, not `_icons`: the food glyphs live in the other half of the merged map, and
+    // guarding on the generated half alone made every one of them draw nothing at all.
+    if (!_all.containsKey(name)) return const SizedBox.shrink();
     final ds = DefaultTextStyle.of(context).style;
     final s = size ?? ds.fontSize ?? 17;
     return SizedBox(

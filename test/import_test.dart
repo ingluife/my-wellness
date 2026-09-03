@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:my_open_gym/data/models/app_state.dart';
-import 'package:my_open_gym/domain/history.dart';
-import 'package:my_open_gym/domain/import_csv.dart';
+import 'package:my_wellness/data/models/app_state.dart';
+import 'package:my_wellness/domain/history.dart';
+import 'package:my_wellness/domain/import_csv.dart';
 
 import 'helpers.dart';
 
