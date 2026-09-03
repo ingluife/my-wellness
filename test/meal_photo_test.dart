@@ -93,11 +93,14 @@ void main() {
     AiProvider? provider,
     AppState? initial,
     bool cancelPicker = false,
+    // Set to make the app boot as if the OS had killed it mid-picker: `recoverLost` answers with
+    // this on the very first frame, the same as a real cold start after that kind of kill.
+    Uint8List? lostBytes,
   }) async {
     final container = ProviderContainer(overrides: [
       aiKeyStoreProvider.overrideWithValue(MemoryAiKeyStore(const {'anthropic': 'sk-ant-x'})),
-      photoCaptureProvider
-          .overrideWithValue(MemoryPhotoCapture(cancelPicker ? null : jpeg)),
+      photoCaptureProvider.overrideWithValue(
+          MemoryPhotoCapture(cancelPicker ? null : jpeg)..lost = lostBytes),
       mealPhotoStoreProvider.overrideWithValue(photos),
       if (provider != null)
         aiMealPhotoProvider.overrideWithValue(provider)
@@ -229,6 +232,22 @@ void main() {
 
     // The whole design in one assertion: a draft on screen, and a log still untouched.
     expect(container.read(appStateProvider).meals, isEmpty);
+    container.dispose();
+  });
+
+  testWidgets('a photo the OS lost mid-picker comes back on its own', (tester) async {
+    // No `shoot()` here on purpose: the sheet is never opened by hand — recovery has to find
+    // the lost photo and open it unprompted, the same way a real cold start would.
+    final container = await pump(
+      tester,
+      lostBytes: jpeg,
+      result: AiDraft(answer([
+        {'fid': chicken.id, 'name': 'Chicken', 'grams': 200},
+      ])),
+    );
+
+    expect(find.text('Check what you ate'), findsOneWidget);
+    expect(find.text(chicken.n), findsOneWidget);
     container.dispose();
   });
 

@@ -2,7 +2,13 @@
     <application
         android:label="My Wellness"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:largeHeap="true">
+        <!-- image_picker decodes the camera's own JPEG before it can downscale it to
+             maxWidth/maxHeight — on a phone with a very high-megapixel sensor that source file
+             can be tens of MB, and the intermediate bitmap has thrown OutOfMemoryError on some
+             devices right at the hand-off from the camera app. A larger heap ceiling is the
+             standard mitigation; it costs nothing when it is not needed. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

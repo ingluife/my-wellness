@@ -12,6 +12,16 @@ import '../domain/ai/jpeg_scrub.dart';
 abstract interface class PhotoCapture {
   /// The photograph, downscaled and scrubbed, or null if the user backed out.
   Future<Uint8List?> pick({required bool fromCamera});
+
+  /// A photograph from a [pick] that never got to return.
+  ///
+  /// On Android, taking a picture hands the whole screen to a separate camera app for as long
+  /// as the shot takes — and if the OS reclaims memory from the now-backgrounded app in that
+  /// window, the process dies with the `pickImage` call still in flight. The camera still has
+  /// the picture; only this app's future is gone. Call this once the app is back in front, and
+  /// it comes back if there was one waiting. Null everywhere else, including iOS, where the
+  /// platform call itself does not exist.
+  Future<Uint8List?> recoverLost();
 }
 
 /// How large a photograph is allowed to be by the time it goes on the wire.
@@ -48,10 +58,27 @@ class ImagePickerCapture implements PhotoCapture {
       imageQuality: 80,
     );
     if (file == null) return null;
+    return _processed(file);
+  }
 
+  @override
+  Future<Uint8List?> recoverLost() async {
+    final LostDataResponse response;
+    try {
+      response = await _picker.retrieveLostData();
+    } on UnimplementedError {
+      // iOS, and any future platform that never loses the call in the first place.
+      return null;
+    }
+    final file = response.file;
+    if (response.isEmpty || file == null) return null;
+    return _processed(file);
+  }
+
+  /// The size guard and the scrub, applied the same way whichever path found the file.
+  Future<Uint8List?> _processed(XFile file) async {
     final bytes = await file.readAsBytes();
     if (bytes.length > _refuseAbove) return null;
-
     return stripJpegMetadata(bytes);
   }
 }
@@ -71,4 +98,11 @@ class MemoryPhotoCapture implements PhotoCapture {
     lastFromCamera = fromCamera;
     return bytes;
   }
+
+  /// What a test sets to make the next [recoverLost] behave as if the OS had killed the app
+  /// mid-picker.
+  Uint8List? lost;
+
+  @override
+  Future<Uint8List?> recoverLost() async => lost;
 }

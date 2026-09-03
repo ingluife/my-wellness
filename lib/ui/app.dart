@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import '../domain/format.dart';
 import '../domain/history.dart';
 import '../domain/i18n.dart';
+import '../state/ai_provider.dart';
 import '../state/app_state_provider.dart';
 import '../state/ui_provider.dart';
 import 'router.dart';
 import 'theme/app_colors.dart';
+import 'sheets/meal_photo_sheet.dart';
 import 'sheets/sheet_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/tokens.dart';
@@ -46,6 +50,9 @@ class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBinding
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     I18n.instance.addListener(_onLanguageChanged);
+    // Covers a cold start after the OS killed the app mid-picker: the first `resumed` callback
+    // is not guaranteed to fire, but the first frame always does.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPhoto());
   }
 
   @override
@@ -69,7 +76,21 @@ class _MyOpenGymAppState extends ConsumerState<MyOpenGymApp> with WidgetsBinding
     }
     if (state == AppLifecycleState.resumed) {
       ref.read(uiProvider).resync(soundOn: ref.read(appStateProvider).sound);
+      _recoverLostPhoto();
     }
+  }
+
+  /// A meal photo taken right as Android reclaims memory can outlive the process that was
+  /// waiting for it: the camera still has the picture, but the pending `pickImage` future — and
+  /// the review sheet that was going to show it — died with the app. Every resume checks for
+  /// one, so the photo is not silently lost. It lands on today, unslotted: the sheet that knew
+  /// which day and slot it was headed for did not survive to say.
+  void _recoverLostPhoto() {
+    unawaited(ref.read(photoCaptureProvider).recoverLost().then((bytes) {
+      if (bytes != null && mounted) {
+        mealPhotoSheet(ref, iso: todayISO(), initialBytes: bytes);
+      }
+    }));
   }
 
   @override

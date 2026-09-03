@@ -44,18 +44,22 @@ import 'sheet_service.dart';
 /// into the log it would be a fabricated number that every downstream reading — the day's totals,
 /// the weekly evolution, the target adjustment — would treat as a record of what was eaten.
 /// A plan is an intention; the log is a record.
-Future<void> mealPhotoSheet(WidgetRef ref, {required String iso, double? slot}) =>
+Future<void> mealPhotoSheet(WidgetRef ref, {required String iso, double? slot, Uint8List? initialBytes}) =>
     showSheet<void>((context, close) =>
-        _MealPhotoSheet(iso: iso, slot: slot, close: close));
+        _MealPhotoSheet(iso: iso, slot: slot, close: close, initialBytes: initialBytes));
 
 enum _Phase { intro, thinking, review, failed }
 
 class _MealPhotoSheet extends ConsumerStatefulWidget {
-  const _MealPhotoSheet({required this.iso, required this.close, this.slot});
+  const _MealPhotoSheet({required this.iso, required this.close, this.slot, this.initialBytes});
 
   final String iso;
   final double? slot;
   final void Function([void]) close;
+
+  /// A photo [PhotoCapture.recoverLost] already found waiting — the sheet skips straight past
+  /// the "take a photo" intro and analyzes it, exactly as if [_capture] had just returned it.
+  final Uint8List? initialBytes;
 
   @override
   ConsumerState<_MealPhotoSheet> createState() => _MealPhotoSheetState();
@@ -68,6 +72,19 @@ class _MealPhotoSheetState extends ConsumerState<_MealPhotoSheet> {
   List<DraftItem> _items = [];
   AiFailureKind? _failure;
 
+  @override
+  void initState() {
+    super.initState();
+    final recovered = widget.initialBytes;
+    if (recovered != null) {
+      // Set directly rather than through setState: this runs before the first build, and the
+      // analysis itself has to wait for that build to land before touching state.
+      _photo = recovered;
+      _phase = _Phase.thinking;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _analyze(recovered));
+    }
+  }
+
   Future<void> _capture({required bool fromCamera}) async {
     final bytes = await ref.read(photoCaptureProvider).pick(fromCamera: fromCamera);
     // Backing out of the picker is not a failure and must not be reported as one.
@@ -77,6 +94,14 @@ class _MealPhotoSheetState extends ConsumerState<_MealPhotoSheet> {
       _photo = bytes;
       _phase = _Phase.thinking;
     });
+    await _analyze(bytes);
+  }
+
+  /// Sends [bytes] to the model and lands on review or failed. Shared by a fresh capture and by
+  /// a photo recovered after the OS killed the app mid-picker — by the time either calls this,
+  /// `_photo`/`_phase` are already set to the "thinking" state.
+  Future<void> _analyze(Uint8List bytes) async {
+    if (!mounted) return;
 
     final s = ref.read(appStateProvider);
     final result = await ref.read(aiMealPhotoProvider).run(mealPhotoRequest(
