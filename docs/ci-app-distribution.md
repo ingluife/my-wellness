@@ -162,3 +162,6 @@ Settings → Secrets and variables → Actions → **Secrets**:
 | `PERMISSION_DENIED` on upload | service account missing `roles/firebaseappdistro.admin`, or App Distribution API not enabled |
 | APK installs but won't update later | `versionCode` didn't increase — `flutter build apk --release` uses `pubspec.yaml` version; bump it or pass `--build-number` |
 | Build signed with debug key | `key.properties` not written — a keystore secret is missing/empty |
+| `Get Key failed: Given final block not properly padded` / `Cannot recover key` in the "Verify signing key" step or `:app:packageRelease` | `ANDROID_KEY_PASSWORD` doesn't match the keystore's key-entry password. If you made the keystore with `keytool` and hit RETURN at the key-password prompt, or it's a PKCS12 store (keytool's default since JDK 9), the key password **is** the store password — set `ANDROID_KEY_PASSWORD` equal to `ANDROID_KEYSTORE_PASSWORD`. Also check neither secret has a trailing newline. |
+| `keystore password was incorrect` in "Verify signing key" | wrong `ANDROID_KEYSTORE_PASSWORD`, or `ANDROID_KEYSTORE_BASE64` is a corrupted/partial copy — regenerate it with `base64 -w0 release.jks` |
+| `Alias <name> does not exist` in "Verify signing key" | `ANDROID_KEY_ALIAS` doesn't match; list the real one with `keytool -list -keystore release.jks` |

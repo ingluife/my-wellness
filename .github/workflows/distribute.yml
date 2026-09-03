@@ -63,16 +63,45 @@ jobs:
       # variables → Actions before this workflow can succeed — see
       # docs/ci-app-distribution.md.
       - name: Restore release keystore
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          test -s android/app/release.keystore
 
       - name: Write keystore properties
+        # Passwords come in through env and are written with printf, not a heredoc: an
+        # unquoted heredoc runs shell expansion over the value, so a password containing
+        # $, `, \ or " would be silently mangled before Gradle ever saw it.
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          cat > android/key.properties <<EOF
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          storeFile=release.keystore
-          EOF
+          set -euo pipefail
+          {
+            printf 'storeFile=release.keystore\n'
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+          } > android/key.properties
+
+      - name: Verify signing key
+        # Fails here with a precise keytool message ("keystore password was incorrect",
+        # "Cannot recover key", "Alias <x> does not exist") instead of six minutes later
+        # inside :app:packageRelease. -certreq touches the private key, so it proves the
+        # key password too, and writes nothing.
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          keytool -certreq -alias "$KEY_ALIAS" \
+            -keystore android/app/release.keystore \
+            -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" > /dev/null
+          echo "Signing key OK — store password, alias and key password all match."
 
       - name: Install dependencies
         run: flutter pub get
