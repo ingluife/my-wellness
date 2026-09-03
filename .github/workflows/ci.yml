@@ -1,0 +1,67 @@
+name: CI
+
+# Runs on every push and pull request against main — no secrets required,
+# unlike distribute.yml (which builds a signed release and needs the
+# Firebase/keystore secrets documented in docs/ci-app-distribution.md).
+# This is the workflow that catches a regression, and link rot in the
+# enrichment registries (tool/enrichment/sources.*.json — see
+# tool/enrich_content.dart), before either reaches main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.9"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test --file-reporter="json:build/test-results.json"
+
+  check-enrichment-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.9"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # One --check-only run per registry — each validates every resource
+      # URL it references (HTTP 200 required; a youtube.com/watch URL is
+      # instead probed via oEmbed and must still be on an official AWS
+      # channel — see tool/enrichment/enrich.dart's youtubeOembedProbeUrl)
+      # without touching any content file. A dead AWS doc link or a removed/
+      # reuploaded video fails the build here instead of reaching a learner.
+      # See tool/enrich_content.dart.
+      - name: Validate enrichment registry links
+        run: |
+          set -e
+          for registry in tool/enrichment/sources.*.json; do
+            echo "::group::$registry"
+            dart run tool/enrich_content.dart --check-only --sources "$registry"
+            echo "::endgroup::"
+          done

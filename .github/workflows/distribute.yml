@@ -1,0 +1,82 @@
+name: Build & Distribute (Firebase App Distribution)
+
+# Builds a release APK and pushes it to Firebase App Distribution.
+#
+# Manual trigger only (workflow_dispatch) — run from the Actions tab when
+# you want to cut a build. See docs/ci-app-distribution.md for the one-time
+# manual setup this workflow depends on (secrets, keystore, Firebase App ID,
+# tester group).
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: "Release notes shown to testers (optional)"
+        required: false
+        type: string
+
+jobs:
+  build-and-distribute:
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.9"
+          channel: stable
+          cache: true
+
+      # Secrets referenced below must exist under Settings → Secrets and
+      # variables → Actions before this workflow can succeed — see
+      # docs/ci-app-distribution.md.
+      - name: Restore Firebase Android config
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > android/app/google-services.json
+
+      - name: Restore Dart Firebase options
+        run: echo "${{ secrets.FIREBASE_OPTIONS_DART_BASE64 }}" | base64 -d > lib/firebase_options.dart
+
+      - name: Restore release keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Write keystore properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=release.keystore
+          EOF
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Get latest commit message
+        id: latest_commit
+        run: |
+          {
+            echo 'message<<EOF'
+            git log -1 --pretty=%B
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          groups: testers
+          file: build/app/outputs/flutter-apk/app-release.apk
+          releaseNotes: ${{ inputs.release_notes || steps.latest_commit.outputs.message }}
