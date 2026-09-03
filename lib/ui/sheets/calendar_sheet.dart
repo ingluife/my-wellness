@@ -78,13 +78,15 @@ class _CalendarState extends ConsumerState<_Calendar> {
       cells.add(GestureDetector(
         onTap: () {
           widget.close();
-          if (iso.compareTo(todayISO()) < 0) {
+          if (ws != null && ws.length == 1) {
+            // Exactly one session — go straight to it, past or not.
+            workoutDetailSheet(ws.first);
+          } else if (iso.compareTo(todayISO()) < 0) {
             // A past day cannot be planned, only reviewed — ISO date strings sort by date.
+            // With no session, or several, the recap is the way in.
             daySummarySheet(iso);
           } else if (ws == null) {
             dayOverrideSheet(iso);
-          } else if (ws.length == 1) {
-            workoutDetailSheet(ws.first);
           } else {
             showSheet<void>((ctx, close2) => Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -496,6 +496,7 @@ class _WeekDay extends ConsumerWidget {
     final planned = effectiveRoutineId(state, iso);
     final overridden = state.dayPlan.containsKey(iso);
     final done = trained.contains(iso);
+    final dayWorkouts = state.workouts.where((w) => w.d == iso).toList();
 
     final dot = done
         ? c.acc
@@ -505,10 +506,13 @@ class _WeekDay extends ConsumerWidget {
 
     return Pressable.builder(
       scale: 1,
-      // A past day can only be reviewed — same recap the month calendar opens; today and
-      // future days still open the planner.
-      onTap: () =>
-          iso.compareTo(todayISO()) < 0 ? daySummarySheet(iso) : dayOverrideSheet(iso),
+      // One session opens straight to it; a past day with none or several opens the recap
+      // (same as the month calendar); today and future still open the planner.
+      onTap: () => dayWorkouts.length == 1
+          ? workoutDetailSheet(dayWorkouts.first)
+          : (iso.compareTo(todayISO()) < 0
+              ? daySummarySheet(iso)
+              : dayOverrideSheet(iso)),
       build: (context, pressed) => AnimatedContainer(
         duration: Motion.fast,
         padding: const EdgeInsets.fromLTRB(2, 8, 2, 9),
