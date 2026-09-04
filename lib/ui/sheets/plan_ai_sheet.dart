@@ -487,6 +487,7 @@ String _failureLine(AiFailureKind kind) => switch (kind) {
       AiFailureKind.offline => t('No connection.'),
       AiFailureKind.badKey => t('That key was refused. Check it in Settings.'),
       AiFailureKind.rateLimited => t('Too many requests just now. Try again in a minute.'),
+      AiFailureKind.noCredit => t('The account has no credit. Check billing with the provider.'),
       AiFailureKind.providerDown => t('The provider had a problem.'),
       AiFailureKind.rejected =>
         t('The provider would not accept the request — the model may no longer exist.'),

@@ -203,8 +203,19 @@ enum AiFailureKind {
   /// 401 / 403 — the key was refused.
   badKey,
 
-  /// 429.
+  /// 429, because requests are arriving faster than the provider will take them.
   rateLimited,
+
+  /// 429, because the account's balance is empty — OpenAI's `insufficient_quota`.
+  ///
+  /// Its own case because [rateLimited]'s advice is not merely unhelpful here, it is wrong: the
+  /// key is good, the model exists, the request was fine, and waiting a minute changes nothing.
+  /// Only adding billing does. Worth a case of its own rather than a rare edge, too, because it
+  /// is the state *every* new key starts in — an OpenAI key is issued before any credit is
+  /// bought, and a ChatGPT subscription does not cover the API, which is billed separately. So
+  /// "the key works but the app says too many requests" is the first thing a user meets, and it
+  /// sends them to retry a limit they never approached.
+  noCredit,
 
   /// 5xx.
   providerDown,

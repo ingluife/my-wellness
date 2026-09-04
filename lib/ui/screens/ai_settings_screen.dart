@@ -336,6 +336,11 @@ class _KeyRowState extends ConsumerState<_KeyRow> {
       AiFailureKind.badKey => t('That key was refused.'),
       AiFailureKind.offline => t('No connection.'),
       AiFailureKind.rateLimited => t('Too many requests just now. Try again in a minute.'),
+      // Said as a verdict on the key, because that is the question this button was pressed to
+      // answer and the answer is genuinely "yes, and". Anything vaguer sends the user back to
+      // re-checking a key that was never the problem.
+      AiFailureKind.noCredit =>
+        t('The key works, but the account has no credit. Add billing with the provider.'),
       AiFailureKind.providerDown => t('The provider had a problem.'),
       AiFailureKind.rejected =>
         t('The provider would not accept the request — the model may no longer exist.'),

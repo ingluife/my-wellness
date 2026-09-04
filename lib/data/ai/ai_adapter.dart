@@ -21,7 +21,10 @@ import 'ai_key_store.dart';
 ///  2. **The key goes in a header and nowhere else.** Read per request, never stored on the
 ///     object, never in a message.
 ///  3. **No provider response body is ever surfaced.** Providers echo request fragments back in
-///     their errors. Map the status code and discard the rest.
+///     their errors. Map the status code and discard the rest. The one place an error body is
+///     opened at all is [kindOf], which reads a single machine-readable field to choose between
+///     two enum values and returns nothing from it — see there for why that is worth the
+///     exception.
 abstract class HttpAiAdapter implements AiProvider {
   HttpAiAdapter({
     required this.model,
@@ -115,7 +118,7 @@ abstract class HttpAiAdapter implements AiProvider {
       final res = await _client
           .post(endpoint, headers: headers(key), body: jsonEncode(body(request)))
           .timeout(timeout);
-      return (res, res.statusCode == 200 ? null : kindOfStatus(res.statusCode));
+      return (res, res.statusCode == 200 ? null : kindOf(res));
     } on TimeoutException {
       return (null, AiFailureKind.timeout);
     } on SocketException {
@@ -166,9 +169,47 @@ abstract class HttpAiAdapter implements AiProvider {
       'AAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAA'
       'AAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/9k=');
 
+  /// What a non-200 amounts to, status code first and body only where the code is ambiguous.
+  ///
+  /// The narrow exception to rule 3 above, and the reason for it: 429 is two different failures
+  /// wearing one status code. One is a rate — wait and retry. The other is an empty balance —
+  /// waiting is futile and the user has to go and add billing. Telling somebody with a brand-new
+  /// key to try again in a minute sends them round a loop that never ends, so the two have to be
+  /// told apart, and the status code cannot do it.
+  ///
+  /// What is read is a machine-readable discriminator and nothing else. No part of the body is
+  /// returned, logged, or shown; the result is still one of the same closed set of kinds.
+  static AiFailureKind kindOf(http.Response res) {
+    final kind = kindOfStatus(res.statusCode);
+    if (kind != AiFailureKind.rateLimited) return kind;
+    return _isQuota(res.body) ? AiFailureKind.noCredit : kind;
+  }
+
+  /// The provider codes that mean "this account has no money left", as opposed to "too fast".
+  ///
+  /// Matched against `error.code` and `error.type`, never against `error.message`: the message is
+  /// English prose that providers reword whenever they like, and a build that pattern-matched it
+  /// would go quietly wrong on a copy edit.
+  static const _quotaCodes = {'insufficient_quota', 'billing_hard_limit_reached'};
+
+  static bool _isQuota(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return false;
+      final error = decoded['error'];
+      if (error is! Map) return false;
+      return _quotaCodes.contains(error['code']) || _quotaCodes.contains(error['type']);
+    } catch (_) {
+      // Not JSON, or not the shape expected. A 429 nobody can classify is still a 429.
+      return false;
+    }
+  }
+
   /// Shared because all three use ordinary HTTP semantics for these.
   static AiFailureKind kindOfStatus(int status) => switch (status) {
         401 || 403 => AiFailureKind.badKey,
+        // Provisional: [kindOf] refines this one against the body, because an exhausted balance
+        // arrives as a 429 too and needs the opposite advice.
         429 => AiFailureKind.rateLimited,
         >= 500 => AiFailureKind.providerDown,
         // Ordered after the three above, so this catches only what they left: a 4xx that is about

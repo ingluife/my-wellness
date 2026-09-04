@@ -241,6 +241,65 @@ void main() {
       expect(await kindOf(() => http.Response('{}', 302)), AiFailureKind.unreadable);
     });
 
+    group('the two 429s are told apart', () {
+      /// The body OpenAI sends when the key is perfectly good and the balance is zero. Both
+      /// fields carry the marker, and each is checked on its own below because providers have
+      /// been inconsistent about which one they populate.
+      String quota({String? code, String? type}) => jsonEncode({
+            'error': {
+              'message': 'You exceeded your current quota, please check your plan and billing '
+                  'details.',
+              'type': type,
+              'param': null,
+              'code': code,
+            },
+          });
+
+      test('an exhausted balance is not a rate limit', () async {
+        // The bug this exists for: a new key with no credit was told to "try again in a minute",
+        // which is advice that can never come true. Nothing here fixes itself by waiting.
+        expect(
+          await kindOf(() => http.Response(quota(code: 'insufficient_quota'), 429)),
+          AiFailureKind.noCredit,
+        );
+        expect(
+          await kindOf(() => http.Response(quota(type: 'insufficient_quota'), 429)),
+          AiFailureKind.noCredit,
+        );
+        expect(
+          await kindOf(() => http.Response(quota(code: 'billing_hard_limit_reached'), 429)),
+          AiFailureKind.noCredit,
+        );
+      });
+
+      test('a real rate limit still reads as one', () async {
+        // The discriminator has to be the code, not the status and not the prose — a 429 that is
+        // genuinely about speed must keep the advice that works for it.
+        expect(
+          await kindOf(() => http.Response(quota(code: 'rate_limit_exceeded'), 429)),
+          AiFailureKind.rateLimited,
+        );
+        // And an unclassifiable 429 stays what the status code alone says, rather than guessing.
+        for (final body in ['', 'not json', '{}', '{"error":"insufficient_quota"}', '[]']) {
+          expect(await kindOf(() => http.Response(body, 429)), AiFailureKind.rateLimited,
+              reason: body);
+        }
+      });
+
+      test('the marker only ever refines a 429', () async {
+        // A 401 carrying the word is still a refused key: the body decides between two readings
+        // of one status code, it does not overrule the status code.
+        expect(
+          await kindOf(() => http.Response(quota(code: 'insufficient_quota'), 401)),
+          AiFailureKind.badKey,
+        );
+        expect(
+          await kindOf(() => http.Response(quota(code: 'insufficient_quota'), 400)),
+          AiFailureKind.rejected,
+        );
+      });
+    });
+
     test('network trouble reads as offline, and a slow reply as a timeout', () async {
       expect(
         await kindOf(() => throw const SocketException('no route to host')),
@@ -344,6 +403,14 @@ void main() {
       expect(await probe(() => http.Response('{}', 401)), AiFailureKind.badKey);
       expect(await probe(() => http.Response('{}', 404)), AiFailureKind.rejected);
       expect(await probe(() => http.Response('{}', 429)), AiFailureKind.rateLimited);
+      // The Test button is where an empty balance is actually met, so the refinement has to
+      // survive this path too — probe judges on the status code, and this is the one case where
+      // the status code is not the whole story.
+      expect(
+        await probe(() =>
+            http.Response('{"error":{"code":"insufficient_quota"}}', 429)),
+        AiFailureKind.noCredit,
+      );
       expect(await probe(() => http.Response('{}', 500)), AiFailureKind.providerDown);
       expect(await probe(() => throw const SocketException('no route')), AiFailureKind.offline);
       expect(await probe(() => throw TimeoutException('slow')), AiFailureKind.timeout);

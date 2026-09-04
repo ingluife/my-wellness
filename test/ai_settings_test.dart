@@ -524,6 +524,13 @@ void main() {
           AiFailureKind.rejected,
           'The provider would not accept the request — the model may no longer exist.'
         ),
+        // An empty balance must not borrow the rate-limit sentence. "Try again in a minute" is
+        // the one piece of advice that is guaranteed not to work here, and it points the user at
+        // a key that is fine.
+        (
+          AiFailureKind.noCredit,
+          'The key works, but the account has no credit. Add billing with the provider.'
+        ),
       ]) {
         final (container, _) =
             await pump(tester, keys: {'anthropic': 'sk-ant-x'}, probe: kind);
