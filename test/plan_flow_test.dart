@@ -1,11 +1,17 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:my_wellness/data/models/app_state.dart';
 import 'package:my_wellness/domain/exercises.dart';
+import 'package:my_wellness/domain/plan_share.dart';
 import 'package:my_wellness/state/app_state_provider.dart';
 import 'package:my_wellness/ui/app.dart';
+import 'package:my_wellness/ui/sheets/plan_sheets.dart';
 import 'package:my_wellness/ui/widgets/controls/surfaces.dart';
+import 'package:my_wellness/ui/widgets/controls/toggles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Plan and RoutineEdit, driven the way a person drives them.
@@ -114,6 +120,66 @@ void main() {
     expect(s.routines, isEmpty);
     // The day it was scheduled on goes back to being a rest day rather than a dangling id.
     expect(s.week['1'], isNull);
+
+    container.dispose();
+  });
+
+  testWidgets('importing a scheduled plan lands routines on their days without touching the switch',
+      (tester) async {
+    final source = AppState.defaults();
+    final r = Routine(id: 'r', name: 'Push Day', ex: [ExerciseConfig(id: '0025', sets: 3)]);
+    source.routines.add(r);
+    source.week['1'] = 'r';
+    final bundle = parsePlan(jsonEncode(buildPlanBundle(source, 'Friend’s plan')));
+
+    final container = await pumpApp(tester);
+    await tester.tap(find.text('Plan').last);
+    await tester.pumpAndSettle();
+
+    // Fired without awaiting: the future it returns only resolves once the sheet is closed by
+    // a later tap, so awaiting it here would deadlock the test.
+    unawaited(planImportSheet(bundle));
+    await tester.pumpAndSettle();
+    // The switch defaults on, since there is a day to give the routine and nothing yet
+    // scheduled to lose.
+    expect(tester.widget<AppSwitch>(find.byType(AppSwitch)).value, isTrue);
+
+    await tapVisible(tester, find.text('Add to my plan'));
+
+    final s = container.read(appStateProvider);
+    expect(s.routines.single.name, 'Push Day');
+    expect(s.week['1'], s.routines.single.id);
+
+    container.dispose();
+  });
+
+  testWidgets('importing a single shared routine leaves the existing week untouched',
+      (tester) async {
+    final existing = Routine(id: 'mine', name: 'My Push');
+    final other = AppState.defaults()..routines.add(Routine(id: 'r', name: 'Their Push'));
+    final bundle = parsePlan(jsonEncode(buildRoutineBundle(other, other.routines.single)));
+
+    final container = await pumpApp(
+      tester,
+      initial: AppState.defaults()
+        ..routines.add(existing)
+        ..week['2'] = 'mine',
+    );
+    await tester.tap(find.text('Plan').last);
+    await tester.pumpAndSettle();
+
+    // Fired without awaiting: the future it returns only resolves once the sheet is closed by
+    // a later tap, so awaiting it here would deadlock the test.
+    unawaited(planImportSheet(bundle));
+    await tester.pumpAndSettle();
+    // No day travels with a single-routine share, so there is nothing to offer applying —
+    // the switch does not even appear.
+    expect(find.byType(AppSwitch), findsNothing);
+
+    await tapVisible(tester, find.text('Add to my plan'));
+
+    final s = container.read(appStateProvider);
+    expect(s.week['2'], 'mine');
 
     container.dispose();
   });

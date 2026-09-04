@@ -328,7 +328,19 @@ class _PlanImport extends ConsumerStatefulWidget {
 }
 
 class _PlanImportState extends ConsumerState<_PlanImport> {
+  // On by default whenever the file actually carries a schedule: the point of importing
+  // someone's plan is to end up scheduled the way they are, so someone who wants to keep their
+  // own Mon–Sun assignments has to notice the switch and turn it off. A file with no days at
+  // all (every single-routine share) must not flip this — mergePlan's "schedule" clears all
+  // seven days before reapplying the bundle's, so turning it on with nothing to reapply would
+  // wipe the recipient's whole week for no reason.
   bool _schedule = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule = widget.bundle.scheduledDays > 0;
+  }
 
   void _commit({String? replaceId, required String toast}) {
     ref.read(appStateProvider.notifier).update(
