@@ -259,6 +259,7 @@ export default {
   "{0} kcal in a kilo, spread over seven days": "一公斤 {0} 千卡，分摊到七天",
   "{0} of the last 14 days so far. Nothing else here means much until there are about seven — an unlogged day reads as a day you did not eat.": "目前最近 14 天里有 {0} 天。在大约七天之前，这里的其他内容都没什么意义——没有记录的一天会被当作你没吃东西的一天。",
   "{0} portions, {1} kcal in all": "{0} 份，共 {1} 千卡",
+  "{0} sessions": "{0} 次训练",
   "{0} saved": "已存 {0} 个",
   "{0} saved · one tap to log": "已存 {0} 个 · 一点即可记录",
   // — Meal slots —

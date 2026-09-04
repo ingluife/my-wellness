@@ -447,25 +447,55 @@ class _PrLine extends StatelessWidget {
 /// width, so it renders a size step down instead of fighting the number for the same line.
 typedef StatTile = ({String label, String value, Color? color, String? unit});
 
-/// Icons for [workoutStatTiles], in the same order.
+/// Icons for [dayStatTiles], in the same order.
 const List<String> workoutStatIcons = ['clock', 'dumbbell', 'list', 'flame'];
 
-/// The canonical headline tiles for one finished workout — Duration, Volume, Sets, and either
-/// Burned kcal (when there is a body weight to cost the session at) or the PR count. Shared by
-/// the finish summary, the History detail sheet and the Home "done today" card so the three
-/// stay in sync.
-List<StatTile> workoutStatTiles(Workout w, AppState s) {
-  // A look back at a session that may be weeks old is costed at its own weigh-in, not today's
-  // body weight; fall back to the latest known weight.
-  final kg = w.bw != null ? kgOf(w.bw!, s.unit) : bodyKg(s);
+/// The canonical headline tiles for one finished workout.
+///
+/// A single session is just a day with one workout in it, so this delegates rather than
+/// duplicating the arithmetic — the one-session and several-session readings of a day cannot
+/// drift apart if there is only one of them.
+List<StatTile> workoutStatTiles(Workout w, AppState s) => dayStatTiles([w], s);
+
+/// The headline tiles for everything trained on one day — Duration, Volume, Sets, and either
+/// Burned kcal (when there is a body weight to cost the sessions at) or the PR count. Shared by
+/// the finish summary, the History detail sheet, the Home "done today" card and the day recap,
+/// so all four stay in sync.
+///
+/// Every figure is a total across [ws], because a day is what a person trained, not what they
+/// trained last. Home used to show only the latest-ending session, which quietly dropped half of
+/// a two-a-day off the screen with nothing to say it was missing.
+List<StatTile> dayStatTiles(List<Workout> ws, AppState s) {
+  // Wall-clock from the first start to the last end would count the hours *between* a morning
+  // and an evening session as training. Summing the sessions is the honest total.
+  final ms = ws.fold(0, (a, w) => a + workoutMs(w));
+  final vol = ws.fold(0.0, (a, w) => a + (w.vol ?? 0));
+  final sets = ws.fold(0, (a, w) => a + setsDone(w));
+
+  // Costed per session rather than on a merged pseudo-workout: a look back at a session that may
+  // be weeks old uses its own weigh-in, not today's body weight, and falls back to the latest
+  // known weight. Summing afterwards keeps that per-session accuracy for free.
+  var burn = 0.0;
+  var costed = false;
+  for (final w in ws) {
+    final kg = w.bw != null ? kgOf(w.bw!, s.unit) : bodyKg(s);
+    if (kg == null) continue;
+    burn += workoutBurn(w, kg);
+    costed = true;
+  }
+
+  // A union, not a sum. The same lift PR'd in both of a day's sessions is one personal record —
+  // the second supersedes the first — and adding the counts would report it twice.
+  final prs = {for (final w in ws) ...w.prs};
+
   return [
-    (label: t('Duration'), value: fmtDur(w.end - w.start), unit: null, color: null),
-    (label: t('Volume'), value: fmtNum(w.vol), unit: s.unit, color: null),
-    (label: t('Sets'), value: '${setsDone(w)}', unit: null, color: null),
-    if (kg != null)
-      (label: t('Burned'), value: '${workoutBurn(w, kg).round()}', unit: t('kcal'), color: null)
+    (label: t('Duration'), value: fmtDur(ms), unit: null, color: null),
+    (label: t('Volume'), value: fmtNum(vol), unit: s.unit, color: null),
+    (label: t('Sets'), value: '$sets', unit: null, color: null),
+    if (costed)
+      (label: t('Burned'), value: '${burn.round()}', unit: t('kcal'), color: null)
     else
-      (label: t('PRs'), value: w.prs.isEmpty ? '—' : '${w.prs.length}', unit: null, color: null),
+      (label: t('PRs'), value: prs.isEmpty ? '—' : '${prs.length}', unit: null, color: null),
   ];
 }
 

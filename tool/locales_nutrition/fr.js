@@ -259,6 +259,7 @@ export default {
   "{0} kcal in a kilo, spread over seven days": "{0} kcal dans un kilo, réparties sur sept jours",
   "{0} of the last 14 days so far. Nothing else here means much until there are about seven — an unlogged day reads as a day you did not eat.": "{0} des 14 derniers jours pour l'instant. Rien d'autre ici ne veut dire grand-chose avant environ sept — une journée non notée est lue comme une journée où tu n'as pas mangé.",
   "{0} portions, {1} kcal in all": "{0} portions, {1} kcal en tout",
+  "{0} sessions": "{0} séances",
   "{0} saved": "{0} enregistrées",
   "{0} saved · one tap to log": "{0} enregistrées · un geste pour noter",
   // — Meal slots —

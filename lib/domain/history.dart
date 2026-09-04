@@ -295,6 +295,23 @@ int setsDone(Workout w) {
   return n;
 }
 
+/// Every session logged on [iso], in the order they were logged.
+///
+/// Nothing stops a day holding several — `_doFinishWorkout` appends unconditionally, so a
+/// freestyle session logged on top of the planned one is two workouts sharing a date. Every
+/// screen that asks "what happened on this day" has to be prepared for a list, and each one used
+/// to open-code this scan; the day is a real unit and deserves one reading of it.
+List<Workout> workoutsOn(AppState s, String iso) =>
+    [for (final w in s.workouts) if (w.d == iso) w];
+
+/// How long one session took, in ms.
+///
+/// Guards the two ways the clock can be missing, neither of which is hypothetical: an imported
+/// session has no `end` at all, and a subtraction on a corrupt pair must not come back negative
+/// and drag a day's total below what was actually trained. `durPart` already suppresses anything
+/// under a minute, so a zero here renders as nothing rather than as "0m".
+int workoutMs(Workout w) => ((w.end == 0 ? w.start : w.end) - w.start).clamp(0, 1 << 40);
+
 int setsDoneActive(ActiveWorkout? a) {
   var n = 0;
   for (final e in a?.entries ?? const <WorkoutEntry>[]) {

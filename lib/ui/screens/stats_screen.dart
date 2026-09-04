@@ -85,13 +85,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               const SizedBox(height: 12),
               Heatmap(
                 state: s,
+                // Straight to that day's recap — its totals and its sessions. It used to open
+                // the whole month for a day with several, which answered a question nobody
+                // asked by tapping a single square.
                 onDay: (iso) {
-                  final ws = s.workouts.where((w) => w.d == iso).toList();
-                  if (ws.length == 1) {
-                    workoutDetailSheet(ws.first);
-                  } else if (ws.isNotEmpty) {
-                    calendarSheet(iso);
-                  }
+                  if (workoutsOn(s, iso).isNotEmpty) daySummarySheet(iso);
                 },
               ),
             ],

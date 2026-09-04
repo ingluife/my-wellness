@@ -259,6 +259,7 @@ export default {
   "{0} kcal in a kilo, spread over seven days": "एक किलो में {0} kcal, सात दिनों में बँटी",
   "{0} of the last 14 days so far. Nothing else here means much until there are about seven — an unlogged day reads as a day you did not eat.": "अब तक पिछले 14 दिनों में से {0}। जब तक करीब सात न हो जाएँ, यहाँ कुछ भी ज़्यादा मायने नहीं रखता — बिना दर्ज दिन ऐसा पढ़ा जाता है जैसे आपने कुछ खाया ही नहीं।",
   "{0} portions, {1} kcal in all": "{0} खुराक, कुल {1} kcal",
+  "{0} sessions": "{0} वर्कआउट",
   "{0} saved": "{0} सहेजी गईं",
   "{0} saved · one tap to log": "{0} सहेजी गईं · दर्ज करने के लिए एक टैप",
   // — Meal slots —

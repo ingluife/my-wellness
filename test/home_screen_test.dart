@@ -105,4 +105,90 @@ void main() {
     expect(find.text('${DateTime.now().day}'), findsWidgets);
     container.dispose();
   });
+
+  group("today's card reports the whole day", () {
+    /// A finished session on [d], carrying a stamped volume the way `doFinishWorkout` leaves it.
+    Workout done(String id, {required double vol, int min = 45, String? d}) {
+      final start = DateTime.now().millisecondsSinceEpoch - min * 60000;
+      return Workout(
+        id: id,
+        d: d ?? todayISO(),
+        start: start,
+        end: start + min * 60000,
+        name: id,
+        vol: vol,
+      );
+    }
+
+    testWidgets('one session is named, and shows its own numbers', (tester) async {
+      final s = AppState.defaults()..workouts.add(done('Push Day', vol: 4000));
+      final container = await pump(tester, s);
+
+      expect(find.text('Push Day'), findsWidgets);
+      expect(find.text('4,000'), findsOneWidget);
+      container.dispose();
+    });
+
+    testWidgets('two sessions are summed, not reduced to the latest', (tester) async {
+      // The bug: the card used to keep only the latest-ending session, so half of a two-a-day
+      // was missing from the screen with nothing to say so.
+      final s = AppState.defaults()
+        ..workouts.addAll([
+          done('Morning', vol: 4000, min: 45),
+          done('Evening', vol: 1500, min: 30),
+        ]);
+      final container = await pump(tester, s);
+
+      expect(find.text('5,500'), findsOneWidget, reason: '4,000 + 1,500');
+      expect(find.text('1,500'), findsNothing, reason: 'the later session alone');
+      container.dispose();
+    });
+
+    testWidgets('two sessions are counted rather than naming only one of them', (tester) async {
+      final s = AppState.defaults()
+        ..workouts.addAll([done('Morning', vol: 4000), done('Evening', vol: 1500)]);
+      final container = await pump(tester, s);
+
+      expect(find.text('2 sessions'), findsOneWidget);
+      expect(find.text('Evening'), findsNothing);
+      container.dispose();
+    });
+
+    testWidgets('tapping the total opens the day, not one of its sessions', (tester) async {
+      final s = AppState.defaults()
+        ..workouts.addAll([done('Morning', vol: 4000), done('Evening', vol: 1500)]);
+      final container = await pump(tester, s);
+
+      await tester.tap(find.text('5,500'));
+      await tester.pumpAndSettle();
+
+      // The day recap lists both sessions; the single-session detail sheet could only show one.
+      expect(find.text('Morning'), findsOneWidget);
+      expect(find.text('Evening'), findsOneWidget);
+      container.dispose();
+    });
+
+    testWidgets('a past day with a single session still opens its recap', (tester) async {
+      // Going straight to the session detail is what made that day's macros and weigh-in
+      // unreachable — the recap is the only place they are shown.
+      final yesterday = isoOf(DateTime.now().subtract(const Duration(days: 1)));
+      final s = AppState.defaults()
+        ..workouts.add(done('Leg Day', vol: 3000, d: yesterday))
+        ..bodyweight.add(BodyWeightEntry(d: yesterday, w: 78.4));
+      final container = await pump(tester, s);
+
+      // Tapped by the cell's weekday letter, which is unique in the strip — the day number is
+      // not, so a bare number finder can land on a stat tile instead.
+      await tester.tap(find.text(days[jsDay(dayOf(yesterday))].toUpperCase()));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Trained'), findsOneWidget);
+      // The session is a row in the recap, one tap from its own detail...
+      expect(find.text('Leg Day'), findsOneWidget);
+      // ...and the day's totals and weigh-in — the things going straight to the detail hid.
+      expect(find.text('3,000'), findsOneWidget);
+      expect(find.text('78.4 kg'), findsOneWidget);
+      container.dispose();
+    });
+  });
 }

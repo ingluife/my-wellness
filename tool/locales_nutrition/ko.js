@@ -259,6 +259,7 @@ export default {
   "{0} kcal in a kilo, spread over seven days": "1 kg당 {0} kcal, 7일에 나눠서",
   "{0} of the last 14 days so far. Nothing else here means much until there are about seven — an unlogged day reads as a day you did not eat.": "지금까지 최근 14일 중 {0}일입니다. 약 7일이 쌓이기 전에는 여기 있는 값이 큰 의미가 없습니다 — 기록하지 않은 날은 먹지 않은 날로 읽힙니다.",
   "{0} portions, {1} kcal in all": "{0}인분, 모두 {1} kcal",
+  "{0} sessions": "운동 {0}개",
   "{0} saved": "{0}개 저장됨",
   "{0} saved · one tap to log": "{0}개 저장됨 · 한 번 눌러 기록",
   // — Meal slots —

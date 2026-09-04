@@ -259,6 +259,7 @@ export default {
   "{0} kcal in a kilo, spread over seven days": "Bir kiloda {0} kcal, yedi güne yayılmış",
   "{0} of the last 14 days so far. Nothing else here means much until there are about seven — an unlogged day reads as a day you did not eat.": "Şimdiye kadar son 14 günün {0} tanesi. Yaklaşık yedi olana dek buradaki hiçbir şey pek anlam taşımaz — kaydedilmeyen bir gün, hiç yemediğin bir gün olarak okunur.",
   "{0} portions, {1} kcal in all": "{0} porsiyon, toplam {1} kcal",
+  "{0} sessions": "{0} antrenman",
   "{0} saved": "{0} kayıtlı",
   "{0} saved · one tap to log": "{0} kayıtlı · eklemek için tek dokunuş",
   // — Meal slots —

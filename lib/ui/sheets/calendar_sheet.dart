@@ -78,34 +78,14 @@ class _CalendarState extends ConsumerState<_Calendar> {
       cells.add(GestureDetector(
         onTap: () {
           widget.close();
-          if (ws != null && ws.length == 1) {
-            // Exactly one session — go straight to it, past or not.
-            workoutDetailSheet(ws.first);
-          } else if (iso.compareTo(todayISO()) < 0) {
-            // A past day cannot be planned, only reviewed — ISO date strings sort by date.
-            // With no session, or several, the recap is the way in.
+          // A day that was trained is reviewed, whatever the date: the recap carries the day's
+          // totals, a row per session, and the nutrition and weigh-in logged against it. A past
+          // day cannot be planned either way — ISO date strings sort by date. Everything else
+          // is still planned rather than reviewed.
+          if (ws != null || iso.compareTo(todayISO()) < 0) {
             daySummarySheet(iso);
-          } else if (ws == null) {
-            dayOverrideSheet(iso);
           } else {
-            showSheet<void>((ctx, close2) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SheetTitle(fmtDate(iso, true)),
-                    AppList(children: [
-                      for (final w in ws)
-                        WorkoutRow(
-                          workout: w,
-                          onTap: () {
-                            close2();
-                            workoutDetailSheet(w);
-                          },
-                        ),
-                    ]),
-                    const SizedBox(height: 8),
-                  ],
-                ));
+            dayOverrideSheet(iso);
           }
         },
         child: Container(
@@ -196,9 +176,13 @@ class _CalendarState extends ConsumerState<_Calendar> {
   }
 }
 
-/// A read-only recap of one past day: what was planned and whether it was trained, the
-/// nutrition logged that day, and the body weight if there was a weigh-in. Opened from the
-/// calendar for any date before today — the past can be reviewed, not planned.
+/// A read-only recap of one day: what was planned and whether it was trained, the day's totals
+/// and every session behind them, the nutrition logged that day, and the body weight if there
+/// was a weigh-in.
+///
+/// Opened for any past date, and for any day that was trained — including today. A trained day
+/// has something to review even while it is still today, and the totals are the only place a
+/// two-a-day is visible as one day's work.
 Future<void> daySummarySheet(String iso) =>
     showSheet<void>((context, close) => _DaySummary(iso: iso, close: close));
 
@@ -213,15 +197,19 @@ class _DaySummary extends ConsumerWidget {
     final c = context.c;
     final s = ref.watch(appStateProvider);
 
-    final ws = s.workouts.where((w) => w.d == iso).toList();
+    final ws = workoutsOn(s, iso);
     final effId = effectiveRoutineId(s, iso);
     Routine? planned;
     for (final r in s.routines) {
       if (r.id == effId) planned = r;
     }
+    // "Missed" is a verdict, and a day still in progress has not earned one: today can reach
+    // this sheet now, and a planned session is not missed until the day is over.
     final status = ws.isNotEmpty
         ? t('Trained')
-        : (planned != null ? t('Missed') : t('Rest day'));
+        : (planned != null
+            ? (iso.compareTo(todayISO()) < 0 ? t('Missed') : t('Planned'))
+            : t('Rest day'));
 
     final target = macroTargets(s);
     final eaten = dayTotals(s, iso);
@@ -239,7 +227,12 @@ class _DaySummary extends ConsumerWidget {
         Text([planned?.name ?? t('Rest'), status].join(' · '),
             style: ts(TypeScale.foot, color: c.label2)),
         const SizedBox(height: 12),
-        if (ws.isNotEmpty)
+        if (ws.isNotEmpty) ...[
+          // The day's total first, then what it is made of. With one session the two say the
+          // same thing from different angles — the tiles give the numbers, the row gives the
+          // name and the way through to the sets.
+          StatTiles(icons: workoutStatIcons, tiles: dayStatTiles(ws, s)),
+          const SizedBox(height: 10),
           AppList(children: [
             for (final w in ws)
               WorkoutRow(
@@ -250,6 +243,7 @@ class _DaySummary extends ConsumerWidget {
                 },
               ),
           ]),
+        ],
         if (target != null) ...[
           if (ws.isNotEmpty) const SizedBox(height: 6),
           Text(t('Nutrition'), style: ts(TypeScale.foot, color: c.label2)),

@@ -176,12 +176,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final sunday = DateTime(monday.year, monday.month, monday.day + 6, 12);
     final doneDays = {for (final w in s.workouts) w.d};
 
-    final todayWorkouts = s.workouts.where((w) => w.d == todayISO()).toList();
-    // Finished, not in progress (s.active is cleared at finish). The latest session wins when
-    // a day holds several — e.g. a freestyle logged on top of the planned one.
-    final doneToday = s.active == null && todayWorkouts.isNotEmpty
-        ? todayWorkouts.reduce((a, b) => b.end >= a.end ? b : a)
-        : null;
+    // Finished, not in progress (s.active is cleared at finish). All of them, not the latest:
+    // a day can hold several — a freestyle logged on top of the planned one — and the card
+    // reports the day's total, so a two-a-day is no longer half invisible here.
+    final doneToday = s.active == null ? workoutsOn(s, todayISO()) : const <Workout>[];
 
     final label = _weekOffset == 0
         ? t('This week')
@@ -192,7 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       // This card is the call to action, so it wears the outline [AppCard.borderColor] is
       // reserved for — see the doc on that field. Once today is trained there is nothing left
       // to act on, so the outline drops away.
-      borderColor: doneToday != null ? null : c.accLine,
+      borderColor: doneToday.isNotEmpty ? null : c.accLine,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -224,13 +222,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           const SizedBox(height: 12),
           _todayRow(context, s, routine, overridden, doneToday),
-          if (doneToday != null) ...[
+          if (doneToday.isNotEmpty) ...[
             const SizedBox(height: 10),
             Pressable(
               scale: 1,
-              onTap: () => workoutDetailSheet(doneToday),
-              child: StatTiles(
-                  icons: workoutStatIcons, tiles: workoutStatTiles(doneToday, s)),
+              // These numbers are the day's, so a day with several sessions opens the recap that
+              // lists them. Dropping into one session from a total would be pointing at the
+              // wrong thing.
+              onTap: () => doneToday.length == 1
+                  ? workoutDetailSheet(doneToday.first)
+                  : daySummarySheet(todayISO()),
+              child:
+                  StatTiles(icons: workoutStatIcons, tiles: dayStatTiles(doneToday, s)),
             ),
           ],
         ],
@@ -239,16 +242,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _todayRow(BuildContext context, AppState s, Routine? routine, bool overridden,
-      Workout? doneWorkout) {
+      List<Workout> doneWorkouts) {
     final c = context.c;
     final active = s.active;
-    final done = active == null && doneWorkout != null;
+    final done = active == null && doneWorkouts.isNotEmpty;
 
     void onTap() {
       if (active != null) {
         context.go('/workout');
       } else if (done) {
-        workoutDetailSheet(doneWorkout);
+        // Same rule as the tiles above: one session goes to it, several go to the day.
+        doneWorkouts.length == 1
+            ? workoutDetailSheet(doneWorkouts.first)
+            : daySummarySheet(todayISO());
       } else if (routine != null) {
         startFlow(ref, routine.id);
       } else {
@@ -290,7 +296,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     active != null
                         ? t('{0} — in progress', active.name)
                         : (done
-                            ? doneWorkout.name
+                            // One session is named; several are counted, because naming only
+                            // the last one is how the second session went missing here.
+                            ? (doneWorkouts.length == 1
+                                ? doneWorkouts.first.name
+                                : t('{0} sessions', doneWorkouts.length))
                             : (routine != null
                                 ? '${routine.name}${overridden ? ' · ${t('rescheduled')}' : ''}'
                                 : t('Rest day'))),
@@ -496,7 +506,7 @@ class _WeekDay extends ConsumerWidget {
     final planned = effectiveRoutineId(state, iso);
     final overridden = state.dayPlan.containsKey(iso);
     final done = trained.contains(iso);
-    final dayWorkouts = state.workouts.where((w) => w.d == iso).toList();
+    final dayWorkouts = workoutsOn(state, iso);
 
     final dot = done
         ? c.acc
@@ -506,13 +516,14 @@ class _WeekDay extends ConsumerWidget {
 
     return Pressable.builder(
       scale: 1,
-      // One session opens straight to it; a past day with none or several opens the recap
-      // (same as the month calendar); today and future still open the planner.
-      onTap: () => dayWorkouts.length == 1
-          ? workoutDetailSheet(dayWorkouts.first)
-          : (iso.compareTo(todayISO()) < 0
-              ? daySummarySheet(iso)
-              : dayOverrideSheet(iso)),
+      // A day that was trained opens its recap — the day's totals, its sessions, and the
+      // nutrition and weigh-in logged against it. A single session no longer short-circuits
+      // past that: it is one row in the recap, one tap from its own detail, and going straight
+      // there is what made a normal training day's macros and body weight unreachable.
+      // An untrained day is still planned rather than reviewed, past excepted.
+      onTap: () => dayWorkouts.isNotEmpty || iso.compareTo(todayISO()) < 0
+          ? daySummarySheet(iso)
+          : dayOverrideSheet(iso),
       build: (context, pressed) => AnimatedContainer(
         duration: Motion.fast,
         padding: const EdgeInsets.fromLTRB(2, 8, 2, 9),
