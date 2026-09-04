@@ -1467,7 +1467,7 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
                   placeholder: '600',
                   suffix: t('kcal'),
                   max: 10000,
-                  onChanged: (v) => _kcal = v,
+                  onChanged: (v) => setState(() => _kcal = v),
                 ),
               ),
             ),
@@ -1482,7 +1482,7 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
                   nullable: true,
                   suffix: t('g'),
                   max: 500,
-                  onChanged: (v) => _p = v,
+                  onChanged: (v) => setState(() => _p = v),
                 ),
               ),
             ),
@@ -1655,10 +1655,10 @@ class _CustomFoodSheetState extends ConsumerState<_CustomFoodSheet> {
             // Per 100 g, so these are not preferences: 100 g of anything cannot hold more than
             // 100 g of one macro, and pure fat is about 900 kcal.
             for (final row in [
-              (t('Calories'), _kcal, (double? v) => _kcal = v, t('kcal'), 900.0),
-              (t('Protein'), _p, (double? v) => _p = v, t('g'), 100.0),
-              (t('Carbs'), _c, (double? v) => _c = v, t('g'), 100.0),
-              (t('Fat'), _f, (double? v) => _f = v, t('g'), 100.0),
+              (t('Calories'), _kcal, (double? v) => setState(() => _kcal = v), t('kcal'), 900.0),
+              (t('Protein'), _p, (double? v) => setState(() => _p = v), t('g'), 100.0),
+              (t('Carbs'), _c, (double? v) => setState(() => _c = v), t('g'), 100.0),
+              (t('Fat'), _f, (double? v) => setState(() => _f = v), t('g'), 100.0),
             ])
               AppRow(
                 title: row.$1,
