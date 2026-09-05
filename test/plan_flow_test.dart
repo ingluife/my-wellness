@@ -10,6 +10,7 @@ import 'package:my_wellness/domain/plan_share.dart';
 import 'package:my_wellness/state/app_state_provider.dart';
 import 'package:my_wellness/ui/app.dart';
 import 'package:my_wellness/ui/sheets/plan_sheets.dart';
+import 'package:my_wellness/ui/widgets/controls/fields.dart';
 import 'package:my_wellness/ui/widgets/controls/surfaces.dart';
 import 'package:my_wellness/ui/widgets/controls/toggles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -149,6 +150,59 @@ void main() {
     final s = container.read(appStateProvider);
     expect(s.routines.single.name, 'Push Day');
     expect(s.week['1'], s.routines.single.id);
+
+    container.dispose();
+  });
+
+  testWidgets(
+      'the exercise picker keeps its filters after you look at what you tapped',
+      (tester) async {
+    final routine = Routine(id: 'r1', name: 'Push Day');
+    final container = await pumpApp(
+      tester,
+      initial: AppState.defaults()..routines.add(routine),
+    );
+    await tester.tap(find.text('Plan').last);
+    await tester.pumpAndSettle();
+
+    await tapVisible(tester, find.widgetWithText(ListItem, 'Push Day').last);
+    await tapVisible(tester, find.text('Add exercise'));
+
+    await tester.enterText(find.byType(SearchField), 'bench press');
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.widgetWithText(AppChip, 'Chest'));
+
+    // The routine editor's own back arrow is a chevron too, so count rather than look for one:
+    // the picker itself is still open underneath (its close cross), on top of that back arrow.
+    int chevrons() => tester
+        .widgetList<IconButtonRound>(find.byType(IconButtonRound))
+        .where((w) => w.icon == 'chevronLeft')
+        .length;
+    int crosses() => tester
+        .widgetList<IconButtonRound>(find.byType(IconButtonRound))
+        .where((w) => w.icon == 'xmark')
+        .length;
+    expect(chevrons(), 1);
+    expect(crosses(), 1);
+
+    final row = find.widgetWithText(ItemText, 'Barbell Bench Press');
+    expect(row, findsOneWidget);
+    await tapVisible(tester, row);
+
+    // Opened on top of the still-open picker, so it gets a back chevron of its own rather than
+    // a second close cross.
+    expect(chevrons(), 2);
+    expect(crosses(), 1);
+
+    await tapVisible(
+      tester,
+      find.byWidgetPredicate((w) => w is IconButtonRound && w.icon == 'chevronLeft').last,
+    );
+
+    // Back on the picker exactly as it was left: same search, same chip, same filtered row.
+    expect(tester.widget<SearchField>(find.byType(SearchField)).value, 'bench press');
+    expect(find.widgetWithText(AppChip, 'Chest'), findsOneWidget);
+    expect(find.widgetWithText(ItemText, 'Barbell Bench Press'), findsOneWidget);
 
     container.dispose();
   });

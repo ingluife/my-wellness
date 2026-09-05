@@ -251,6 +251,11 @@ Map<String, int> _usageMap(AppState s) {
 /// Pick an exercise. Opens on everything, narrows by search, body part and equipment, and
 /// offers what you have already chosen first — which is what you want when building a routine
 /// out of the twenty exercises you actually do.
+///
+/// Stays open under whatever picking an exercise leads to (the config sheet, the custom-exercise
+/// form) so dismissing that leaves you back on the list exactly as you left it — same search,
+/// same chips, same page, same scroll. Picking calls `onPick` but never pops itself; only the
+/// shell's own close (the chevron, the drag, the barrier) does.
 Future<void> exercisePicker(void Function(Exercise ex) onPick) =>
     showSheet<void>((context, close) => _ExercisePicker(onPick: onPick, close: close));
 
@@ -390,20 +395,14 @@ class _ExercisePickerState extends ConsumerState<_ExercisePicker> {
                 child: AppIcon('sparkles', size: 21, color: c.label2),
               ),
               trailing: [AppIcon('plus', size: 15, color: c.label, stroke: 2.4)],
-              onTap: () {
-                widget.close();
-                customExSheet(prefill: _q.trim(), onDone: widget.onPick);
-              },
+              onTap: () => customExSheet(prefill: _q.trim(), onDone: widget.onPick),
               child: ItemText(t('Create your own exercise'),
                   subtitle: t('name + body part, no animation')),
             ),
           for (final e in f.take(_shown))
             ListItem(
               leading: ExerciseThumb(ex: e),
-              onTap: () {
-                widget.close();
-                widget.onPick(e);
-              },
+              onTap: () => widget.onPick(e),
               trailing: [
                 if (usage.containsKey(e.id))
                   Tag(null, icon: 'starFill', accent: true),

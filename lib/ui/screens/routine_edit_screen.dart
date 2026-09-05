@@ -13,6 +13,7 @@ import '../../domain/plan_share.dart';
 import '../../domain/progression.dart';
 import '../../platform/backup.dart';
 import '../../state/app_state_provider.dart';
+import '../app.dart';
 import '../sheets/exercise_sheets.dart';
 import '../sheets/plan_sheets.dart';
 import '../sheets/routine_sheets.dart';
@@ -199,7 +200,10 @@ class _RoutineEditScreenState extends ConsumerState<RoutineEditScreen> {
           onTap: () => exercisePicker((ex) => exConfigSheet(
                 ex: ex,
                 routine: r,
-                onSave: (cfg) => _edit((list) => list.add(cfg.copy()..id = ex.id)),
+                onSave: (cfg) {
+                  _edit((list) => list.add(cfg.copy()..id = ex.id));
+                  ref.read(uiProvider).toast(t('“{0}” added to {1}', ex.n, r.name));
+                },
               )),
         ),
         const SizedBox(height: 10),

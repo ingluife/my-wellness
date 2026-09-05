@@ -276,18 +276,21 @@ class _ActiveWorkout extends ConsumerWidget {
           exercisePicker((ex) => exConfigSheet(
                 ex: ex,
                 routine: routine,
-                onSave: (cfg) => ref.read(appStateProvider.notifier).update((st) {
-                  final full = cfg.copy()..id = ex.id;
-                  final r = st.routines.where((x) => x.id == st.active!.routineId).firstOrNull;
-                  final plan = nextPrescription(st, full, r);
-                  st.active!.entries.add(WorkoutEntry(
-                    id: ex.id,
-                    target: cfg.copy(),
-                    plan: plan,
-                    sets: applyPrescription(buildSets(st, full), plan),
-                  ));
-                  st.active!.cur = st.active!.entries.length - 1;
-                }),
+                onSave: (cfg) {
+                  ref.read(appStateProvider.notifier).update((st) {
+                    final full = cfg.copy()..id = ex.id;
+                    final r = st.routines.where((x) => x.id == st.active!.routineId).firstOrNull;
+                    final plan = nextPrescription(st, full, r);
+                    st.active!.entries.add(WorkoutEntry(
+                      id: ex.id,
+                      target: cfg.copy(),
+                      plan: plan,
+                      sets: applyPrescription(buildSets(st, full), plan),
+                    ));
+                    st.active!.cur = st.active!.entries.length - 1;
+                  });
+                  ref.read(uiProvider).toast(t('Added {0}', capitalized(ex.n)));
+                },
               ));
         }),
         const SizedBox(height: 10),
