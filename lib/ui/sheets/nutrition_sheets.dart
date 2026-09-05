@@ -597,7 +597,12 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final f = widget.food;
+    ref.watch(appStateProvider);
+    // A custom food can be edited from this very sheet, so the numbers below have to come from
+    // the live registry rather than the (possibly stale) instance the caller opened us with —
+    // `registerCustom` runs before the state that triggers this rebuild is assigned, so the
+    // index is always ahead of the widget tree that reads it.
+    final f = widget.food.custom ? (foods[widget.food.id] ?? widget.food) : widget.food;
     final item = f.portion(_grams);
     final macros = (kcal: item.kcal, p: item.p, c: item.c, f: item.f);
 
@@ -700,18 +705,43 @@ class _FoodDetailSheetState extends ConsumerState<_FoodDetailSheet> {
                         style: ts(TypeScale.head, color: c.label, weight: FontWeight.w600)),
                   ],
                 ),
-                const SizedBox(height: 10),
-                MacroSplit(macros: macros),
-                const SizedBox(height: 8),
-                MacroLegend(macros: macros),
-                if (f.fibreIn(_grams) case final fibre? when fibre > 0) ...[
-                  const SizedBox(height: 6),
-                  Text('${t('Fibre')} ${fmtNum(fibre)} g',
-                      style: ts(TypeScale.cap, color: c.label3)),
-                ],
+                const SizedBox(height: 12),
+                Center(child: MacroDonut(macros: macros)),
+                const SizedBox(height: 14),
+                MacroRows(
+                  macros: macros,
+                  extras: [
+                    if (Food.per(f.fib, _grams) case final v? when v > 0)
+                      (label: 'Fibre', g: v),
+                    if (Food.per(f.sug, _grams) case final v? when v > 0)
+                      (label: 'Sugars', g: v),
+                    if (Food.per(f.sat, _grams) case final v? when v > 0)
+                      (label: 'Saturates', g: v),
+                    if (Food.per(f.salt, _grams) case final v? when v > 0)
+                      (label: 'Salt', g: v),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${t('Per 100 g')}: ${f.kcal.round()} ${t('kcal')} · '
+                  '${fmtNum(f.p)}P ${fmtNum(f.c)}C ${fmtNum(f.f)}${t('F')}',
+                  style: ts(TypeScale.cap, color: c.label3),
+                ),
               ],
             ),
           ),
+          if (f.custom) ...[
+            const SizedBox(height: 8),
+            AppButton(t('Edit food'),
+                icon: 'pencil',
+                variant: BtnVariant.tinted,
+                onTap: () {
+                  final cf = ref.read(appStateProvider).nutrition.foods
+                      .where((x) => x.id == f.id)
+                      .firstOrNull;
+                  if (cf != null) customFoodSheet(existing: cf);
+                }),
+          ],
           if (swapsFor(ref.watch(appStateProvider), f) case final swaps
               when swaps.isNotEmpty) ...[
             const SizedBox(height: 4),
@@ -1535,7 +1565,7 @@ List<Food> recentFoods(AppState s, {int take = 8}) {
   return out;
 }
 
-/// A food the catalogue does not carry.
+/// A food the catalogue does not carry — created, or edited.
 ///
 /// Opened empty from the food library, and prefilled from the photo sheet, where the model has
 /// just described a food the catalogue does not have and the figures are already on screen. The
@@ -1543,10 +1573,15 @@ List<Food> recentFoods(AppState s, {int take = 8}) {
 /// purpose: this sheet is the app's ordinary way of adding a food, and it should not have to know
 /// that an AI feature exists to be handed a starting point.
 ///
+/// [existing] switches the sheet to editing: every field seeds from it instead of the loose
+/// prefill arguments, saving mutates that same food in place, and a delete button appears —
+/// the same shape `customExSheet` uses for custom exercises.
+///
 /// [onSaved] replaces the jump to `foodDetailSheet` — a caller that has its own idea of what
 /// happens next (the photo review, which wants the new food back in the row it came from) says so
 /// by passing one.
 Future<void> customFoodSheet({
+  CustomFood? existing,
   String? iso,
   double? slot,
   String? name,
@@ -1558,6 +1593,7 @@ Future<void> customFoodSheet({
   void Function(CustomFood)? onSaved,
 }) =>
     showSheet<void>((context, close) => _CustomFoodSheet(
+          existing: existing,
           iso: iso,
           slot: slot,
           close: close,
@@ -1573,6 +1609,7 @@ Future<void> customFoodSheet({
 class _CustomFoodSheet extends ConsumerStatefulWidget {
   const _CustomFoodSheet({
     required this.close,
+    this.existing,
     this.iso,
     this.slot,
     this.name,
@@ -1584,6 +1621,7 @@ class _CustomFoodSheet extends ConsumerStatefulWidget {
     this.onSaved,
   });
 
+  final CustomFood? existing;
   final String? iso;
   final double? slot;
   final String? name;
@@ -1606,20 +1644,30 @@ class _CustomFoodSheetState extends ConsumerState<_CustomFoodSheet> {
   double? _p;
   double? _c;
   double? _f;
+  double? _fib;
+  double? _sug;
+  double? _sat;
+  double? _salt;
 
   @override
   void initState() {
     super.initState();
     // Every field stays editable. A prefill is a starting point the user can overwrite, which is
     // the whole reason the photo sheet sends them here instead of saving a food behind their back.
-    _name.text = widget.name ?? '';
+    final e = widget.existing;
+    _name.text = e?.n ?? widget.name ?? '';
+    final cat = e?.cat ?? widget.cat;
     // Only a category the app actually has; anything else keeps the default rather than putting
     // a value in the picker that none of its options match.
-    if (widget.cat != null && foodCategories.contains(widget.cat)) _cat = widget.cat!;
-    _kcal = widget.kcal;
-    _p = widget.p;
-    _c = widget.c;
-    _f = widget.f;
+    if (cat != null && foodCategories.contains(cat)) _cat = cat;
+    _kcal = e?.kcal ?? widget.kcal;
+    _p = e?.p ?? widget.p;
+    _c = e?.c ?? widget.c;
+    _f = e?.f ?? widget.f;
+    _fib = e?.fib;
+    _sug = e?.sug;
+    _sat = e?.sat;
+    _salt = e?.salt;
   }
 
   @override
@@ -1631,12 +1679,13 @@ class _CustomFoodSheetState extends ConsumerState<_CustomFoodSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final editing = widget.existing != null;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          SheetTitle(t('Your own food')),
+          SheetTitle(editing ? t('Edit food') : t('Your own food')),
           Text(t('Per 100 g, the way the labels are written.'),
               style: ts(TypeScale.foot, color: c.label2)),
           const SizedBox(height: 12),
@@ -1674,8 +1723,31 @@ class _CustomFoodSheetState extends ConsumerState<_CustomFoodSheet> {
                 ),
               ),
           ]),
+          const SizedBox(height: 10),
+          Text(t('Optional, the rest of the label'), style: ts(TypeScale.foot, color: c.label3)),
+          Section(children: [
+            for (final row in [
+              (t('Fibre'), _fib, (double? v) => setState(() => _fib = v)),
+              (t('Sugars'), _sug, (double? v) => setState(() => _sug = v)),
+              (t('Saturates'), _sat, (double? v) => setState(() => _sat = v)),
+              (t('Salt'), _salt, (double? v) => setState(() => _salt = v)),
+            ])
+              AppRow(
+                title: row.$1,
+                trailing: SizedBox(
+                  width: 110,
+                  child: NumberBox(
+                    value: row.$2,
+                    nullable: true,
+                    suffix: t('g'),
+                    max: 100.0,
+                    onChanged: row.$3,
+                  ),
+                ),
+              ),
+          ]),
           const SizedBox(height: 6),
-          AppButton(t('Save food'), variant: BtnVariant.primary, onTap: () {
+          AppButton(editing ? t('Save') : t('Save food'), variant: BtnVariant.primary, onTap: () {
             final name = _name.text.trim();
             if (name.isEmpty) {
               ref.read(uiProvider).toast(t('Give it a name'));
@@ -1685,22 +1757,50 @@ class _CustomFoodSheetState extends ConsumerState<_CustomFoodSheet> {
               ref.read(uiProvider).toast(t('Enter the calories per 100 g'));
               return;
             }
+            final id = widget.existing?.id ?? 'cf${uid()}';
             final food = CustomFood(
-              id: 'cf${uid()}',
+              id: id,
               n: name,
               cat: _cat,
               kcal: _kcal ?? 0,
               p: _p ?? 0,
               c: _c ?? 0,
               f: _f ?? 0,
+              fib: _fib,
+              sug: _sug,
+              sat: _sat,
+              salt: _salt,
             );
-            ref.read(appStateProvider.notifier)
-                .update((st) => st.nutrition.foods.add(food.copy()));
+            ref.read(appStateProvider.notifier).update((st) {
+              if (editing) {
+                for (final cf in st.nutrition.foods) {
+                  if (cf.id == id) {
+                    cf
+                      ..n = name
+                      ..cat = _cat
+                      ..kcal = food.kcal
+                      ..p = food.p
+                      ..c = food.c
+                      ..f = food.f
+                      ..fib = _fib
+                      ..sug = _sug
+                      ..sat = _sat
+                      ..salt = _salt;
+                  }
+                }
+              } else {
+                st.nutrition.foods.add(food.copy());
+              }
+            });
             widget.close();
             final saved = widget.onSaved;
             if (saved != null) {
               // The caller is mid-flow and wants the food, not a portion form on top of it.
               saved(food);
+              return;
+            }
+            if (editing) {
+              ref.read(uiProvider).toast(t('Saved'));
               return;
             }
             // Straight on to the portion, because adding a food is almost never the actual
@@ -1709,9 +1809,44 @@ class _CustomFoodSheetState extends ConsumerState<_CustomFoodSheet> {
               foodDetailSheet(Food.fromCustom(food), iso: widget.iso, slot: widget.slot);
             }
           }),
+          if (editing) ...[
+            const SizedBox(height: 8),
+            AppButton(t('Delete food'),
+                variant: BtnVariant.danger,
+                icon: 'trash',
+                onTap: () {
+                  widget.close();
+                  deleteCustomFood(ref, widget.existing!);
+                }),
+          ],
           const SizedBox(height: 8),
         ],
       ),
     );
   }
+}
+
+/// Remove one of your own foods.
+///
+/// Already-logged meals keep their stored numbers — `MealItem` snapshots them at the moment
+/// they were eaten, and a dangling id renders through `Foods.or` — so nothing else needs to
+/// change on the way out, unlike a deleted exercise's name.
+///
+/// The notifier and the toast are read out of [ref] up front, not inside `onConfirm`: the sheet
+/// this is called from closes itself right away, and by the time the confirm dialog's own button
+/// is actually tapped its widget is long unmounted — `ref.read` at that point throws rather than
+/// reading stale state.
+void deleteCustomFood(WidgetRef ref, CustomFood food) {
+  final notifier = ref.read(appStateProvider.notifier);
+  final ui = ref.read(uiProvider);
+  confirmSheet(
+    title: t('Delete “{0}”?', food.n),
+    message: t('Already-logged meals keep their numbers.'),
+    confirmText: t('Delete'),
+    danger: true,
+    onConfirm: () {
+      notifier.update((st) => st.nutrition.foods.removeWhere((x) => x.id == food.id));
+      ui.toast(t('Deleted {0}', food.n));
+    },
+  );
 }

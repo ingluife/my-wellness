@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../data/models/app_state.dart';
 import '../../domain/coaching.dart';
+import '../../domain/foods.dart';
 import '../../domain/format.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
@@ -599,8 +600,8 @@ class _MealSlot extends ConsumerWidget {
               ),
               Text(
                 targetKcal > 0
-                    ? '${eaten.round()} / ${targetKcal.round()}'
-                    : '${eaten.round()}',
+                    ? '${eaten.round()} / ${targetKcal.round()} ${t('kcal')}'
+                    : '${eaten.round()} ${t('kcal')}',
                 style: ts(TypeScale.foot, color: c.label2),
               ),
               const SizedBox(width: 6),
@@ -643,6 +644,8 @@ class _MealSlot extends ConsumerWidget {
           if (m != null && m.items.isNotEmpty) ...[
             const SizedBox(height: 9),
             MacroSplit(macros: (kcal: m.kcal, p: m.p, c: m.c, f: m.f), height: 4),
+            const SizedBox(height: 6),
+            MacroLegend(macros: (kcal: m.kcal, p: m.p, c: m.c, f: m.f)),
             const SizedBox(height: 8),
             // The picture and the list it produced, side by side. Only when there is one — most
             // meals are logged by hand and the card has to look untouched for them.
@@ -688,7 +691,10 @@ class _MealSlot extends ConsumerWidget {
 
   Widget _itemLine(BuildContext context, WidgetRef ref, Meal m, MealItem item) {
     final c = context.c;
-    return Padding(
+    // A dangling id — the food it was logged against has since been deleted — has nothing to
+    // reopen, so the row stays inert rather than editing against a placeholder with no macros.
+    final food = item.fid == null ? null : foods[item.fid];
+    final row = Padding(
       padding: const EdgeInsets.only(bottom: 3),
       child: Row(
         children: [
@@ -700,6 +706,12 @@ class _MealSlot extends ConsumerWidget {
               style: ts(TypeScale.cap, color: c.label2),
             ),
           ),
+          const SizedBox(width: 6),
+          Text(
+            '${fmtNum(item.p)}${t('P')} ${fmtNum(item.c)}${t('C')} ${fmtNum(item.f)}${t('F')}',
+            style: ts(TypeScale.cap, color: c.label4),
+          ),
+          const SizedBox(width: 6),
           Text('${item.kcal.round()}', style: ts(TypeScale.cap, color: c.label3)),
           const SizedBox(width: 6),
           Pressable(
@@ -709,6 +721,19 @@ class _MealSlot extends ConsumerWidget {
           ),
         ],
       ),
+    );
+    if (food == null) return row;
+    // Reopens the same food this item was logged against, seeded with the grams it already
+    // carries — the recipe editor's `_editIngredient` does the same thing for an ingredient.
+    return Pressable(
+      scale: 1,
+      onTap: () => foodDetailSheet(
+        food,
+        initialGrams: item.g,
+        actionLabel: t('Save'),
+        onPicked: (edited) => _replace(ref, m, item, edited),
+      ),
+      child: row,
     );
   }
 
@@ -724,16 +749,31 @@ class _MealSlot extends ConsumerWidget {
     return null;
   }
 
+  /// Identity match for one logged item: [MealItem] has no id of its own, so a replace or a
+  /// remove has to find its way back by the values it was logged with.
+  static int _indexOf(List<MealItem> items, MealItem item) => items.indexWhere(
+      (x) => x.fid == item.fid && x.g == item.g && x.kcal == item.kcal && x.n == item.n);
+
   void _remove(WidgetRef ref, Meal m, MealItem item) {
     ref.read(appStateProvider.notifier).update((st) {
       final meal = st.meals.where((x) => x.id == m.id).firstOrNull;
       if (meal == null) return;
-      final i = meal.items.indexWhere((x) =>
-          x.fid == item.fid && x.g == item.g && x.kcal == item.kcal && x.n == item.n);
+      final i = _indexOf(meal.items, item);
       if (i >= 0) meal.items.removeAt(i);
       // An empty meal is not a meal. Its photograph goes with it — not here, but at the next boot
       // sweep, which is where every "this file has nothing pointing at it" decision is made.
       if (meal.items.isEmpty) st.meals.removeWhere((x) => x.id == meal.id);
+    });
+  }
+
+  /// Corrects a logged item's portion in place, from the food sheet reopened on it — replacing
+  /// rather than appending, so fixing a mistyped weight does not double the entry.
+  void _replace(WidgetRef ref, Meal m, MealItem item, MealItem edited) {
+    ref.read(appStateProvider.notifier).update((st) {
+      final meal = st.meals.where((x) => x.id == m.id).firstOrNull;
+      if (meal == null) return;
+      final i = _indexOf(meal.items, item);
+      if (i >= 0) meal.items[i] = edited;
     });
   }
 }

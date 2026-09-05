@@ -204,6 +204,10 @@ class CustomFood {
     this.p = 0,
     this.c = 0,
     this.f = 0,
+    this.fib,
+    this.sug,
+    this.sat,
+    this.salt,
   });
 
   final String id;
@@ -214,6 +218,13 @@ class CustomFood {
   double c;
   double f;
 
+  /// The rest of a nutrition label, per 100 g. Null, not zero — "not said" and "zero" are
+  /// different answers, and only a value the user actually typed should ever reach the sheet.
+  double? fib;
+  double? sug;
+  double? sat;
+  double? salt;
+
   factory CustomFood.fromJson(Map<String, dynamic> j) => CustomFood(
         id: asStr(j['id']) ?? '',
         n: asStr(j['n']) ?? '',
@@ -222,18 +233,29 @@ class CustomFood {
         p: asNumOr(j['p'], 0),
         c: asNumOr(j['c'], 0),
         f: asNumOr(j['f'], 0),
+        fib: asNum(j['fib']),
+        sug: asNum(j['sug']),
+        sat: asNum(j['sat']),
+        salt: asNum(j['salt']),
       );
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'n': n,
-    'cat': cat,
-    'kcal': jsonNum(kcal),
-    'p': jsonNum(p),
-    'c': jsonNum(c),
-    'f': jsonNum(f),
-    'custom': true,
-  };
+  Map<String, dynamic> toJson() {
+    final m = <String, dynamic>{
+      'id': id,
+      'n': n,
+      'cat': cat,
+      'kcal': jsonNum(kcal),
+      'p': jsonNum(p),
+      'c': jsonNum(c),
+      'f': jsonNum(f),
+      'custom': true,
+    };
+    putNum(m, 'fib', fib);
+    putNum(m, 'sug', sug);
+    putNum(m, 'sat', sat);
+    putNum(m, 'salt', salt);
+    return m;
+  }
 
   CustomFood copy() => CustomFood.fromJson(toJson());
 }

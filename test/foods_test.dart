@@ -116,10 +116,10 @@ void main() {
     test('it scales with the portion, and is null when unknown', () {
       final oats = all.firstWhere((f) => f.n == 'Oats');
       expect(oats.fib, greaterThan(0));
-      expect(oats.fibreIn(200), closeTo(oats.fib! * 2, 1e-9));
+      expect(Food.per(oats.fib, 200), closeTo(oats.fib! * 2, 1e-9));
 
       const bare = Food(id: 'x', n: 'x', cat: 'veg', kcal: 1, p: 0, c: 0, f: 0);
-      expect(bare.fibreIn(100), isNull);
+      expect(Food.per(bare.fib, 100), isNull);
     });
 
     test('fibre never exceeds the carbohydrate it is part of', () {
@@ -127,6 +127,42 @@ void main() {
         if (f.fib == null) continue;
         expect(f.fib, lessThanOrEqualTo(f.c + 0.51), reason: '${f.n}: ${f.fib}F vs ${f.c}C');
       }
+    });
+  });
+
+  group('the rest of the label', () {
+    test('a custom food carries sugars, saturates and salt through to Food', () {
+      final cf = CustomFood(
+          id: 'cf9', n: 'Granola', kcal: 450, p: 10, c: 60, f: 15,
+          fib: 6, sug: 20, sat: 3, salt: 0.4);
+      final food = Food.fromCustom(cf);
+      expect(food.fib, 6);
+      expect(food.sug, 20);
+      expect(food.sat, 3);
+      expect(food.salt, 0.4);
+    });
+
+    test('a custom food with none of them stays null, not zero', () {
+      final food = Food.fromCustom(CustomFood(id: 'cf10', n: 'Plain rice', kcal: 130));
+      expect(food.fib, isNull);
+      expect(food.sug, isNull);
+      expect(food.sat, isNull);
+      expect(food.salt, isNull);
+    });
+
+    test('a custom food round-trips its nutrients through JSON', () {
+      final cf = CustomFood(id: 'cf11', n: 'Yogurt', kcal: 60, sug: 4.5, sat: 1.2, salt: 0.1);
+      final back = CustomFood.fromJson(cf.toJson());
+      expect(back.sug, 4.5);
+      expect(back.sat, 1.2);
+      expect(back.salt, 0.1);
+      expect(back.fib, isNull);
+      expect(cf.toJson().containsKey('fib'), isFalse);
+    });
+
+    test('Food.per scales any label figure, and is null when unset', () {
+      expect(Food.per(20.0, 50), 10.0);
+      expect(Food.per(null, 50), isNull);
     });
   });
 

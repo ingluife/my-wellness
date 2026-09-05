@@ -43,6 +43,9 @@ class Food {
     this.by,
     this.lic,
     this.fib,
+    this.sug,
+    this.sat,
+    this.salt,
     this.portions = const [],
     this.custom = false,
     this.missing = false,
@@ -76,6 +79,13 @@ class Food {
   /// what makes a meal filling — but a fifth number to hit would work against teaching one
   /// thing at a time.
   final double? fib;
+
+  /// Grams of sugar, saturated fat, and salt per 100 g. Same reasoning as [fib]: shown on the
+  /// label, tracked, never targeted. The bundled catalogue carries none of these yet — they
+  /// exist so a food you type in yourself can hold the rest of what its own label says.
+  final double? sug;
+  final double? sat;
+  final double? salt;
 
   /// Household measures, smallest first. Empty for a custom food, and for the 27 catalogue
   /// foods whose USDA portions were all bulk or ambiguous.
@@ -120,6 +130,9 @@ class Food {
         by: asStr(j['by']),
         lic: asStr(j['lic']),
         fib: asNum(j['fib']),
+        sug: asNum(j['sug']),
+        sat: asNum(j['sat']),
+        salt: asNum(j['salt']),
         portions: [
           for (final p in (j['por'] is List ? j['por'] as List : const []))
             if (p is Map) FoodPortion.fromJson(Map<String, dynamic>.from(p))
@@ -134,6 +147,10 @@ class Food {
         p: c.p,
         c: c.c,
         f: c.f,
+        fib: c.fib,
+        sug: c.sug,
+        sat: c.sat,
+        salt: c.salt,
         custom: true,
       );
 
@@ -148,8 +165,11 @@ class Food {
         f: f * grams / 100,
       );
 
-  /// Fibre in a portion of [grams], or null when the food has no fibre figure.
-  double? fibreIn(double grams) => fib == null ? null : fib! * grams / 100;
+  /// Scales a per-100 g label figure — [fib], [sug], [sat] or [salt] — to a portion of [grams].
+  /// Null when the food carries no figure for it, so a nutrient never entered stays absent
+  /// rather than showing up as zero.
+  static double? per(double? per100, double grams) =>
+      per100 == null ? null : per100 * grams / 100;
 }
 
 /// The catalogue order the library browses in, and the order category chips appear in:
