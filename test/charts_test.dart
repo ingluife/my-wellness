@@ -154,5 +154,29 @@ void main() {
         expect(tester.takeException(), isNull, reason: b.name);
       }
     });
+
+    testWidgets('the donut paints for a real split and for an empty food, in both themes',
+        (tester) async {
+      for (final b in Brightness.values) {
+        await tester.pumpWidget(host(const MacroDonut(macros: target), b: b));
+        expect(tester.takeException(), isNull, reason: b.name);
+
+        // No macros at all falls back to a bare track rather than dividing by zero.
+        await tester.pumpWidget(
+            host(const MacroDonut(macros: (kcal: 0.0, p: 0.0, c: 0.0, f: 0.0)), b: b));
+        expect(tester.takeException(), isNull, reason: b.name);
+      }
+    });
+
+    testWidgets('the rows paint the macros and any extras, in both themes', (tester) async {
+      for (final b in Brightness.values) {
+        await tester.pumpWidget(host(
+          const MacroRows(macros: target, extras: [(label: 'Fibre', g: 8.0)]),
+          b: b,
+        ));
+        expect(tester.takeException(), isNull, reason: b.name);
+        expect(find.textContaining('160'), findsOneWidget, reason: b.name);
+      }
+    });
   });
 }

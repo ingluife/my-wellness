@@ -16,6 +16,7 @@ import 'package:flutter/widgets.dart';
 import 'package:my_wellness/ui/widgets/app_icon.dart';
 import 'package:my_wellness/ui/widgets/controls/app_button.dart';
 import 'package:my_wellness/ui/widgets/controls/fields.dart';
+import 'package:my_wellness/ui/widgets/controls/pressable.dart';
 import 'package:my_wellness/ui/widgets/controls/stepper.dart';
 import 'package:my_wellness/ui/widgets/controls/surfaces.dart';
 import 'package:my_wellness/ui/widgets/macro_bar.dart';
@@ -171,6 +172,58 @@ void main() {
 
     expect(find.textContaining('Chicken breast'), findsWidgets);
     expect(find.byType(MacroSplit), findsWidgets);
+    // The macro legend and the item's own macros, not just the split bar.
+    expect(find.byType(MacroLegend), findsWidgets);
+    expect(find.textContaining('45P'), findsWidgets);
+    container.dispose();
+  });
+
+  testWidgets('tapping a logged item reopens it at its grams, and Save replaces it in place',
+      (tester) async {
+    final s = profiled();
+    s.meals.add(Meal(
+      id: 'm1',
+      d: todayISO(),
+      slot: 0,
+      items: [MealItem(fid: 'f0010', g: 200, kcal: 240, p: 45, c: 0, f: 5.2)],
+    ));
+    final container = await pump(tester, s, '/nutrition');
+
+    final row = find
+        .ancestor(of: find.textContaining('Chicken breast'), matching: find.byType(Pressable))
+        .first;
+    await press(tester, row);
+
+    // Reopened at the grams the item was already logged with, not a bare 100 g default.
+    expect(tester.widget<NumberBox>(find.byType(NumberBox)).value, 200);
+
+    await tester.enterText(find.byType(NumberBox), '150');
+    await tester.pumpAndSettle();
+    await press(tester, find.text('Save'));
+
+    final items = container.read(appStateProvider).meals.single.items;
+    expect(items, hasLength(1), reason: 'replaced, not appended');
+    expect(items.single.g, 150);
+    container.dispose();
+  });
+
+  testWidgets('a logged item whose food has been deleted stays inert', (tester) async {
+    final s = profiled();
+    s.meals.add(Meal(
+      id: 'm1',
+      d: todayISO(),
+      slot: 0,
+      // No catalogue food and no custom food resolves this id — the food it was logged
+      // against is gone.
+      items: [MealItem(fid: 'cfGone', n: 'Old shake', g: 100, kcal: 380, p: 80, c: 0, f: 0)],
+    ));
+    final container = await pump(tester, s, '/nutrition');
+
+    await press(tester, find.textContaining('Old shake').first);
+    // Nothing to reopen, so the row does nothing rather than editing a placeholder with no
+    // macros — the log sheet (which the card's own onTap still opens) is the only thing that
+    // could show up, and it has no "Grams" field of its own.
+    expect(find.byType(NumberBox), findsNothing);
     container.dispose();
   });
 
@@ -203,6 +256,96 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(FoodThumb), findsWidgets);
     container.dispose();
+  });
+
+  group('custom foods', () {
+    // The food detail sheet stays mounted underneath the edit form (the same nesting the "how
+    // many" stepper test above works around), and it carries a "Grams" NumberBox of its own —
+    // so a bare `find.byType(NumberBox).at(0)` from the edit form lands on the wrong sheet.
+    // Scoping to the row titled [label] finds the one inside the form instead.
+    Finder numberBoxFor(String label) => find.descendant(
+          of: find.ancestor(of: find.text(label), matching: find.byType(AppRow)),
+          matching: find.byType(NumberBox),
+        );
+
+    testWidgets('creating one shows up in the detail sheet with the rest of the label',
+        (tester) async {
+      final container = await pump(tester, profiled(), '/nutrition');
+      await press(tester, find.text('Breakfast', skipOffstage: false));
+      await press(tester, find.text('Your own food'));
+
+      await tester.enterText(find.byType(AppTextField), 'Granola');
+      // Calories, Protein, Carbs, Fat, then the optional Fibre, Sugars, Saturates, Salt — in
+      // that order, matching the form.
+      final boxes = find.byType(NumberBox);
+      await tester.enterText(boxes.at(0), '450');
+      await tester.enterText(boxes.at(5), '20');
+      await tester.pumpAndSettle();
+
+      await press(tester, find.text('Save food'));
+
+      // Straight on to the portion sheet, which renders the extra nutrient as its own row.
+      expect(find.text('Sugars'), findsOneWidget);
+      expect(find.textContaining('20'), findsWidgets);
+
+      final saved = container.read(appStateProvider).nutrition.foods;
+      expect(saved.single.n, 'Granola');
+      expect(saved.single.sug, 20);
+      expect(saved.single.fib, isNull);
+      container.dispose();
+    });
+
+    testWidgets('editing an existing one updates the detail sheet underneath, unreopened',
+        (tester) async {
+      final s = profiled();
+      s.nutrition.foods
+          .add(CustomFood(id: 'cf1', n: 'Granola', kcal: 450, p: 10, c: 60, f: 15));
+      final container = await pump(tester, s, '/nutrition/foods');
+      // The library's default sort is by protein density, and Granola's is low enough to fall
+      // outside the first page — the same [findFood] the picker tests use searches for it.
+      await press(tester, await findFood(tester, 'Granola'));
+      await press(tester, find.text('Edit food'));
+
+      await tester.enterText(numberBoxFor('Calories'), '500');
+      await tester.pumpAndSettle();
+      await press(tester, find.text('Save'));
+
+      // The sheet underneath, not a fresh one — it watches state and rebuilds on its own.
+      expect(find.textContaining('500'), findsWidgets);
+      expect(container.read(appStateProvider).nutrition.foods.single.kcal, 500);
+      container.dispose();
+    });
+
+    testWidgets('deleting one removes it, and an already-logged meal keeps its numbers',
+        (tester) async {
+      final s = profiled();
+      s.nutrition.foods
+          .add(CustomFood(id: 'cf1', n: 'Granola', kcal: 450, p: 10, c: 60, f: 15));
+      // A custom food's name is stamped onto the item at the moment it is logged (Food.portion),
+      // so the meal has to carry it explicitly here too, the way the real flow would.
+      s.meals.add(Meal(
+        id: 'm1',
+        d: todayISO(),
+        slot: 0,
+        items: [MealItem(fid: 'cf1', n: 'Granola', g: 50, kcal: 225, p: 5, c: 30, f: 7.5)],
+      ));
+      final container = await pump(tester, s, '/nutrition/foods');
+      // The library's default sort is by protein density, and Granola's is low enough to fall
+      // outside the first page — the same [findFood] the picker tests use searches for it.
+      await press(tester, await findFood(tester, 'Granola'));
+      await press(tester, find.text('Edit food'));
+      await press(tester, find.text('Delete food'));
+      await press(tester, find.text('Delete'));
+
+      final after = container.read(appStateProvider);
+      expect(after.nutrition.foods, isEmpty);
+      container.dispose();
+
+      final container2 = await pump(tester, after, '/nutrition');
+      expect(find.textContaining('Granola'), findsWidgets);
+      expect(tester.takeException(), isNull);
+      container2.dispose();
+    });
   });
 
   testWidgets('Home carries a nutrition card only once there is a profile', (tester) async {

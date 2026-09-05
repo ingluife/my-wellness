@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 
 import '../../domain/i18n.dart';
@@ -222,6 +223,136 @@ class MacroSplit extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One food's or one meal's macro split as a three-segment ring, calories in the centre.
+///
+/// The detail sheet's fuller sibling to [MacroSplit]: same energy-share maths, drawn as a ring
+/// rather than a bar because a single number — a food's total calories — has somewhere to sit
+/// once the shape has a middle.
+class MacroDonut extends StatelessWidget {
+  const MacroDonut({super.key, required this.macros, this.size = 116});
+
+  final Macros macros;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final m = macroColors(context);
+    final p = macros.p * 4, cb = macros.c * 4, f = macros.f * 9;
+    final total = p + cb + f;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _DonutPainter(
+          shares: total <= 0 ? const [] : [p / total, cb / total, f / total],
+          colors: [m.p, m.c, m.f],
+          track: c.surface3,
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                macros.kcal.round().toString(),
+                style: ts(TypeScale.large, size: size * .24, color: c.label, weight: FontWeight.w600),
+              ),
+              Text(t('kcal'), style: ts(TypeScale.cap, color: c.label3)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DonutPainter extends CustomPainter {
+  _DonutPainter({required this.shares, required this.colors, required this.track});
+
+  final List<double> shares;
+  final List<Color> colors;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = size.width * .14;
+    final rect = Rect.fromLTWH(stroke / 2, stroke / 2, size.width - stroke, size.height - stroke);
+    final base = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt
+      ..color = track;
+    canvas.drawArc(rect, 0, math.pi * 2, false, base);
+
+    if (shares.isEmpty) return;
+    var start = -math.pi / 2;
+    for (var i = 0; i < shares.length; i++) {
+      final sweep = math.pi * 2 * shares[i];
+      if (sweep <= 0) continue;
+      canvas.drawArc(rect, start, sweep, false, base..color = colors[i]);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DonutPainter old) =>
+      !listEquals(old.shares, shares) || !listEquals(old.colors, colors) || old.track != track;
+}
+
+/// One row per macro — dot, full name, grams, share of calories — for wherever [MacroLegend]'s
+/// two-letter abbreviations read as too little. `extras` appends label-only rows with no dot and
+/// no percentage, for nutrients (fibre, sugars, saturates, salt) that are on the label but not
+/// part of the energy split.
+class MacroRows extends StatelessWidget {
+  const MacroRows({super.key, required this.macros, this.extras = const []});
+
+  final Macros macros;
+  final List<({String label, double g})> extras;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final m = macroColors(context);
+    final p = macros.p * 4, cb = macros.c * 4, f = macros.f * 9;
+    final total = p + cb + f;
+    double pct(double share) => total <= 0 ? 0 : share / total * 100;
+
+    Widget row({Color? color, required String label, required double g, double? pct}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            children: [
+              if (color != null) ...[
+                Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(label, style: ts(TypeScale.foot, color: c.label2)),
+              ),
+              Text('${g.round()} ${t('g')}', style: ts(TypeScale.foot, color: c.label, weight: FontWeight.w500)),
+              if (pct != null) ...[
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 34,
+                  child: Text('${pct.round()}%',
+                      textAlign: TextAlign.end, style: ts(TypeScale.foot, color: c.label3)),
+                ),
+              ],
+            ],
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row(color: m.p, label: t('Protein'), g: macros.p, pct: pct(p)),
+        row(color: m.c, label: t('Carbs'), g: macros.c, pct: pct(cb)),
+        row(color: m.f, label: t('Fat'), g: macros.f, pct: pct(f)),
+        for (final e in extras) row(label: t(e.label), g: e.g),
+      ],
     );
   }
 }

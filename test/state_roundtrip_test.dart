@@ -194,6 +194,50 @@ void main() {
       expect(s.toJson()['nutrition'], {'dismissedAdj': 1741000000000});
     });
 
+    test('a custom food carries the rest of the label only when it was given one', () {
+      final s = AppState.defaults();
+      s.nutrition.foods.add(CustomFood(id: 'cf1', n: 'Granola', kcal: 450, sug: 20, sat: 3));
+      final foods = s.toJson()['nutrition']['foods'] as List;
+      expect(foods.single, {
+        'id': 'cf1',
+        'n': 'Granola',
+        'cat': 'other',
+        'kcal': 450,
+        'p': 0,
+        'c': 0,
+        'f': 0,
+        'custom': true,
+        'sug': 20,
+        'sat': 3,
+      });
+
+      final out = AppState.fromJson(s.toJson());
+      expect(out.nutrition.foods.single.sug, 20);
+      expect(out.nutrition.foods.single.sat, 3);
+      expect(out.nutrition.foods.single.fib, isNull);
+      expect(out.nutrition.foods.single.salt, isNull);
+    });
+
+    test('a custom food saved before these fields existed still loads with none of them', () {
+      // The fixture predates fib/sug/sat/salt entirely — a backup made before this change has
+      // to keep loading, and the food it carries should not gain figures nobody ever entered.
+      final s = AppState.fromJson({
+        'nutrition': {
+          'foods': [
+            {'id': 'cf9', 'n': 'Old shake', 'cat': 'protein', 'kcal': 380, 'p': 80, 'custom': true},
+          ],
+        },
+      });
+      final food = s.nutrition.foods.single;
+      expect(food.fib, isNull);
+      expect(food.sug, isNull);
+      expect(food.sat, isNull);
+      expect(food.salt, isNull);
+      expect(s.toJson()['nutrition']['foods'], [
+        {'id': 'cf9', 'n': 'Old shake', 'cat': 'protein', 'kcal': 380, 'p': 80, 'c': 0, 'f': 0, 'custom': true},
+      ]);
+    });
+
     test('the deep clone reaches into meals', () {
       final s = AppState.fromJson(withNutrition);
       final clone = s.copy();
