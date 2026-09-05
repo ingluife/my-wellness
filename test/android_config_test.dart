@@ -66,6 +66,8 @@ void main() {
       'RECEIVE_BOOT_COMPLETED',
       'VIBRATE',
       'WAKE_LOCK',
+      'FOREGROUND_SERVICE',
+      'FOREGROUND_SERVICE_SPECIAL_USE',
       // Meal photos. The only reason this app touches the network at all.
       'INTERNET',
     ]) {
@@ -81,5 +83,31 @@ void main() {
     // surely it needs CAMERA" is exactly the change this test exists to stop.
     expect(declared, isNot(contains('android.permission.CAMERA')),
         reason: 'declaring CAMERA breaks ACTION_IMAGE_CAPTURE rather than enabling it');
+  });
+
+  test('the workout notification service declares a foreground-service type and its subtype '
+      'property, and has a source file to match', () {
+    final service =
+        RegExp(r'<service\s+android:name="([^"]*WorkoutNotificationService)"[\s\S]*?</service>')
+            .firstMatch(manifest);
+    expect(service, isNotNull, reason: 'no <service> for WorkoutNotificationService');
+
+    final block = service![0]!;
+    expect(block, contains('android:exported="false"'),
+        reason: 'a service nothing outside the app calls must not be exported');
+    expect(block, contains('android:foregroundServiceType="specialUse"'),
+        reason: 'targetSdk 34+ requires a typed foreground service, not just the plain '
+            'permission — see the permissions test above');
+    expect(block, contains('android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE'),
+        reason: 'specialUse requires this property or the service throws at startForeground()');
+
+    // Same drift this file's other tests guard MainActivity against: the manifest and the
+    // Kotlin source must agree on where the class actually lives.
+    final namespace = valueOf('namespace');
+    final declaredName = service.group(1)!;
+    final fqcn = declaredName.startsWith('.') ? '$namespace$declaredName' : declaredName;
+    final path = 'android/app/src/main/kotlin/${fqcn.replaceAll('.', '/')}.kt';
+    expect(File(path).existsSync(), isTrue,
+        reason: 'the manifest points at $fqcn, but there is no source at $path');
   });
 }

@@ -857,5 +857,14 @@
     "this isn’t a My Wellness plan file",
     "{0} min",
     "{0} routines saved"
+  ],
+  "workout": [
+    "Log sets from the lock screen",
+    "A notification stays up during a workout, with buttons to log a set without unlocking your phone.",
+    "All sets logged",
+    "Open the app to finish the workout",
+    "Set {0}/{1}",
+    "Adjusting {0} · tap to switch to {1}",
+    "✓ Set"
   ]
 }

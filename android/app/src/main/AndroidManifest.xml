@@ -47,6 +47,20 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+        <!-- The ongoing, quick-action notification for an active workout — see
+             lib/platform/workout_notification.dart. `specialUse` because there is no narrower
+             foreground-service type for "keep a workout log notification interactive while the
+             screen is locked"; `dataSync` and `mediaPlayback` would both misdescribe what this
+             does. Never started except while a session is running and the Settings toggle for
+             it is on — see WorkoutNotification.sync. -->
+        <service
+            android:name=".WorkoutNotificationService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Live logging of an in-progress workout from its ongoing notification" />
+        </service>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -73,6 +87,11 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Keeps the screen on while a workout is running. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The workout quick-action notification, opt-in in Settings. Both are required from
+         targetSdk 34 on — the typed permission alongside the plain one, and the service's own
+         foregroundServiceType in <application> above. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Meal photos, and nothing else. This is the only network the app makes: a request goes out
          only when the user has set up their own API key and taken a photo for it, straight to the
          provider they chose. No http client is even constructed unless the feature is available.

@@ -6,6 +6,7 @@ import '../../domain/exercises.dart';
 import '../../domain/format.dart';
 import '../../domain/history.dart';
 import '../../domain/i18n.dart';
+import '../../domain/set_columns.dart';
 import '../../state/app_state_provider.dart';
 import '../app.dart';
 import '../sheets/exercise_sheets.dart';
@@ -19,16 +20,6 @@ import '../widgets/controls/stepper.dart';
 import '../widgets/controls/surfaces.dart';
 import '../widgets/controls/toggles.dart';
 import '../widgets/media.dart';
-
-/// One column of a set row.
-typedef SetColumn = ({
-  String field,
-  double step,
-  bool decimal,
-  String heading,
-  bool optional,
-  String? effortScale,
-});
 
 /// One exercise inside a running workout: the animation, what it is, what you did last time,
 /// why the numbers are what they are, and the set rows themselves.
@@ -60,58 +51,10 @@ class ExerciseBlock extends ConsumerWidget {
         : [bestWeightFor(s, entry.id), s.exWeights[entry.id]?.w ?? 0]
             .reduce((x, y) => x > y ? x : y);
 
-    // A bodyweight set has no weight to type, so the column is not there — one stepper instead
-    // of two, which is the whole point of the flag. Adding a belt weight in the config brings
-    // it back, now labelled as the addition it is.
-    final bw = !cardio && isBw(cfg);
-    final added = bw && entry.sets.any((x) => (x.w ?? 0) > 0);
-
-    final loadCol = (
-      field: 'w',
-      step: 2.5,
-      decimal: true,
-      heading: bw ? t('Added ({0})', s.unit) : t('Weight ({0})', s.unit),
-      optional: false,
-      effortScale: null,
-    );
-    // The reps column is the total in every mode, unilateral included — the stepper walks in
-    // twos there so the number you land on is one you can actually split evenly.
-    final repCol = (
-      field: 'r',
-      step: repStep(cfg),
-      decimal: false,
-      heading: t('Reps'),
-      optional: false,
-      effortScale: null,
-    );
-
-    final SetColumn col1 = cardio
-        ? (field: 'min', step: 1, decimal: false, heading: t('Duration (min)'), optional: false, effortScale: null)
-        : timed
-            ? (field: 'sec', step: 5, decimal: false, heading: t('Seconds'), optional: false, effortScale: null)
-            : (bw && !added ? repCol : loadCol);
-
-    final SetColumn? col2 = cardio
-        ? (field: 'speed', step: 0.5, decimal: true, heading: t('Speed (km/h)'), optional: false, effortScale: null)
-        : timed
-            ? ((bw && !added) ? null : loadCol)
-            : ((bw && !added) ? null : repCol);
-
-    // Effort only makes sense for weighted rep sets, not cardio or timed holds, and is opt-in
-    // since it adds a third stepper to every row. Optional, because an unlogged effort is not
-    // the same as 0 — RIR 0 says the set went to failure.
-    final kind = effortOf(s);
-    final eff = effortScales[kind];
-    final SetColumn? col3 = mode == 'reps' && eff != null
-        ? (
-            field: eff.f,
-            step: eff.step,
-            decimal: true,
-            heading: t(eff.hd),
-            optional: true,
-            effortScale: kind,
-          )
-        : null;
+    final cols = setColumnsFor(s, entry);
+    final col1 = cols.col1;
+    final col2 = cols.col2;
+    final col3 = cols.col3;
 
     final plan = entry.plan;
     final showWhy = plan != null && plan.why != null && plan.kind != 'off';
@@ -399,62 +342,22 @@ class _SetRow extends ConsumerWidget {
   }
 
   /// Checking a set off is where most of the session's behaviour lives: the rest timer, the
-  /// working-weight prompt and the finish prompt all hang off this one action.
+  /// working-weight prompt and the finish prompt all hang off this one action. The mutation
+  /// itself lives in [ActiveSession.toggle] — shared with the quick-action notification — and
+  /// this just dispatches on what it reports.
   void _toggle(WidgetRef ref) {
-    final s = ref.read(appStateProvider);
-    final a = s.active;
-    if (a == null) return;
-
-    final units = supersetUnits(a.entries);
-    final unit = unitOf(units, entryIndex);
-    final unitIdx = units.indexWhere((u) => u.contains(entryIndex));
-    final isLastUnit = unitIdx >= units.length - 1;
-    final entry = a.entries[entryIndex];
-    final mode = modeOf(entry.cfg);
-
-    var askTop = false;
-    var exJustDone = false;
-    var workoutDone = false;
-
-    ref.read(appStateProvider.notifier).update((st) {
-      final e = st.active!.entries[entryIndex];
-      final set = e.sets[setIndex];
-      set.done = !set.done;
-      if (!set.done) return;
-
-      ref.read(uiProvider).setDone(st.sound);
-      final isLastExInUnit = entryIndex == unit.last;
-      final unitDone = unit.every((ui) =>
-          st.active!.entries[ui].sets.every((x) => x.done));
-      if (isLastExInUnit && !unitDone) {
-        ref.read(uiProvider).startRest(st.restSec, soundOn: st.sound);
-      } else if (unitDone) {
-        ref.read(uiProvider).stopRest();
-      }
-      if (unitDone && isLastUnit) workoutDone = true;
-
-      // Only loaded reps training has a "working weight" worth confirming — a bodyweight plank
-      // has nothing to put in that slider, and neither does a set of push-ups.
-      final loaded =
-          mode == 'reps' && !(isBw(e.cfg) && !e.sets.any((x) => (x.w ?? 0) > 0));
-      if (e.sets.every((x) => x.done)) {
-        exJustDone = true;
-        if (loaded && !e.asked) {
-          e.asked = true;
-          askTop = true;
-        }
-      }
-    });
+    final result = ref.read(activeSessionProvider).toggle(entryIndex, setIndex);
+    if (result == null) return;
 
     // reps: the top-weight sheet first — it chains into the finish prompt on the last unit.
     // cardio/timed, or already confirmed: straight to the prompt.
-    if (askTop) {
+    if (result.askTopWeight) {
       topWeightSheet(ref, entryIndex);
-    } else if (workoutDone) {
+    } else if (result.workoutDone) {
       workoutCompleteSheet(ref);
-    } else if (exJustDone && mode == 'cardio') {
+    } else if (result.exerciseDone && result.mode == 'cardio') {
       ref.read(uiProvider).toast(t('Cardio logged'));
-    } else if (exJustDone && mode == 'time') {
+    } else if (result.exerciseDone && result.mode == 'time') {
       ref.read(uiProvider).toast(t('Hold logged'));
     }
   }

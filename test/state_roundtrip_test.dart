@@ -78,6 +78,19 @@ void main() {
     expect(out['somethingFromANewerBuild'], source['somethingFromANewerBuild']);
   });
 
+  test('workoutNotif is absent until turned on, like nutrition, meals and ai', () {
+    final off = AppState.defaults();
+    expect(off.workoutNotif, isFalse);
+    expect(off.toJson().containsKey('workoutNotif'), isFalse);
+
+    final on = AppState.defaults()..workoutNotif = true;
+    expect(on.toJson()['workoutNotif'], isTrue);
+    expect(AppState.fromJson(on.toJson()).workoutNotif, isTrue);
+
+    // Round-trips back off the same way every other absent-until-used key does.
+    expect(AppState.fromJson(off.toJson()).workoutNotif, isFalse);
+  });
+
   // Nutrition is the first feature with state openGym has no default for. It has to stay
   // invisible until it is used: openGym overlays a loaded state on DEF, so a key it does not
   // know is carried through untouched, but a key this build writes into *every* export would

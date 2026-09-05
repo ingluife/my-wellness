@@ -860,4 +860,13 @@ export default {
   "this isn’t a My Wellness plan file": "यह My Wellness प्लान फ़ाइल नहीं है",
   "{0} min": "{0} मिनट",
   "{0} routines saved": "{0} रूटीन सहेजे गए",
+
+  // — Workout quick-action notification —
+  "Log sets from the lock screen": "लॉक स्क्रीन से सेट लॉग करें",
+  "A notification stays up during a workout, with buttons to log a set without unlocking your phone.": "वर्कआउट के दौरान एक सूचना बनी रहती है, जिसमें फ़ोन अनलॉक किए बिना सेट लॉग करने के लिए बटन होते हैं।",
+  "All sets logged": "सभी सेट लॉग हो गए",
+  "Open the app to finish the workout": "वर्कआउट खत्म करने के लिए ऐप खोलें",
+  "Set {0}/{1}": "सेट {0}/{1}",
+  "Adjusting {0} · tap to switch to {1}": "{0} समायोजित हो रहा है · {1} पर बदलने के लिए टैप करें",
+  "✓ Set": "✓ सेट",
 }

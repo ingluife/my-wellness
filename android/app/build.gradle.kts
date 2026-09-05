@@ -77,4 +77,9 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    // NotificationCompat/NotificationManagerCompat/NotificationChannelCompat for
+    // WorkoutNotificationService. flutter_local_notifications carries its own copy, but as an
+    // `implementation` dependency of a separate Gradle module it is not visible to app's own
+    // Kotlin source, so this app needs its own.
+    implementation("androidx.core:core-ktx:1.18.0")
 }

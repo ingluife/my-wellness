@@ -13,6 +13,7 @@ import '../domain/format.dart';
 import '../domain/i18n.dart';
 import '../platform/reminders.dart';
 import '../platform/wake_lock.dart';
+import '../platform/workout_notification.dart';
 
 final stateRepositoryProvider = Provider<StateRepository>((ref) {
   final repo = StateRepository();
@@ -111,6 +112,10 @@ class AppStateController extends Notifier<AppState> {
     // whichever screen happened to change it.
     if (_reminderChanged(before, next)) Reminders.instance.sync(next);
     ScreenWakeLock.instance.set(next.active != null && next.keepAwake);
+    // Runs on every write, not just the ones that change a set — it is what keeps the
+    // notification from ever disagreeing with the state, whichever side changed it. See the
+    // doc on WorkoutNotification for why that matters more here than for the reminder above.
+    unawaited(WorkoutNotification.instance.sync(next));
   }
 
   /// Only the parts of the state a scheduled reminder is built from.

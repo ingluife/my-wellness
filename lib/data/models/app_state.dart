@@ -35,6 +35,7 @@ class AppState {
     this.gifSize = 'full',
     this.effort,
     this.showRir,
+    this.workoutNotif = false,
     Reminder? reminder,
     List<BodyWeightEntry>? bodyweight,
     List<Routine>? routines,
@@ -91,6 +92,11 @@ class AppState {
   /// read the way it expects.
   bool? showRir;
 
+  /// The ongoing quick-action notification during a workout — off by default, opt-in in
+  /// Settings. Absent from a backup until turned on, like [nutrition] and [ai]: openGym has no
+  /// default for it, so a profile that never used it round-trips byte-for-byte unchanged.
+  bool workoutNotif;
+
   Reminder reminder;
 
   List<BodyWeightEntry> bodyweight;
@@ -130,8 +136,8 @@ class AppState {
 
   static const _known = {
     'unit', 'restSec', 'sound', 'keepAwake', 'lang', 'theme', 'accent', 'body', 'targetW',
-    'gifSize', 'effort', 'showRir', 'reminder', 'bodyweight', 'routines', 'week', 'dayPlan',
-    'exWeights', 'workouts', 'active', 'customEx', 'nutrition', 'meals', 'ai', '_ts',
+    'gifSize', 'effort', 'showRir', 'workoutNotif', 'reminder', 'bodyweight', 'routines', 'week',
+    'dayPlan', 'exWeights', 'workouts', 'active', 'customEx', 'nutrition', 'meals', 'ai', '_ts',
   };
 
   /// `DEF` from useStore.js.
@@ -151,6 +157,7 @@ class AppState {
       gifSize: asStr(j['gifSize']) ?? 'full',
       effort: asStr(j['effort']),
       showRir: j['showRir'] is bool ? j['showRir'] as bool : null,
+      workoutNotif: asBool(j['workoutNotif']),
       reminder: j['reminder'] is Map ? Reminder.fromJson(asMap(j['reminder'])) : Reminder(),
       bodyweight: asList(j['bodyweight'], BodyWeightEntry.fromJson),
       routines: asList(j['routines'], Routine.fromJson),
@@ -205,6 +212,8 @@ class AppState {
     };
     // Only ever written when a profile still carries it — see [showRir].
     put(m, 'showRir', showRir);
+    // Absent until switched on — see the doc on [workoutNotif].
+    if (workoutNotif) m['workoutNotif'] = true;
     // Both are absent until the feature is used, so a profile that never opened Nutrition still
     // exports exactly the JSON openGym does. Writing them unconditionally would put two keys it
     // has no default for into every backup and break the round-trip the whole model is built on.

@@ -860,4 +860,13 @@ export default {
   "this isn’t a My Wellness plan file": "это не файл плана My Wellness",
   "{0} min": "{0} мин",
   "{0} routines saved": "Сохранено программ: {0}",
+
+  // — Workout quick-action notification —
+  "Log sets from the lock screen": "Записывать подходы с экрана блокировки",
+  "A notification stays up during a workout, with buttons to log a set without unlocking your phone.": "Во время тренировки остаётся уведомление с кнопками для записи подхода без разблокировки телефона.",
+  "All sets logged": "Все подходы записаны",
+  "Open the app to finish the workout": "Откройте приложение, чтобы завершить тренировку",
+  "Set {0}/{1}": "Подход {0}/{1}",
+  "Adjusting {0} · tap to switch to {1}": "Изменение {0} · нажмите, чтобы переключиться на {1}",
+  "✓ Set": "✓ Подход",
 }

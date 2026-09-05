@@ -9,6 +9,7 @@ import '../../domain/history.dart';
 import '../../domain/i18n.dart';
 import '../../state/app_state_provider.dart';
 import '../app.dart';
+import '../../platform/notification_permission.dart';
 import '../../platform/reminders.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -197,9 +198,29 @@ class WorkoutsSection extends ConsumerWidget {
       });
     }
 
+    final notifOn = state.workoutNotif;
+
+    Future<void> toggleNotif(bool next) async {
+      if (next) {
+        await Reminders.instance.init();
+        final ok =
+            await ensureNotificationPermission(Reminders.instance.plugin, interactive: true);
+        if (!ok) {
+          ref.read(uiProvider).toast(t('Could not change notification settings'));
+          return;
+        }
+      }
+      ref.read(appStateProvider.notifier).update((st) => st.workoutNotif = next);
+    }
+
+    final footer = [
+      if (on) t('Reminds you at this time on days that have a routine planned.'),
+      if (notifOn) t('A notification stays up during a workout, with buttons to log a set without unlocking your phone.'),
+    ].join(' ');
+
     return Section(
       title: t('Workouts'),
-      footer: on ? t('Reminds you at this time on days that have a routine planned.') : null,
+      footer: footer.isEmpty ? null : footer,
       children: [
         AppRow(
           icon: 'timer',
@@ -240,6 +261,12 @@ class WorkoutsSection extends ConsumerWidget {
               });
             },
           ),
+        AppRow(
+          icon: 'bell',
+          iconTint: c.sys.orange,
+          title: t('Log sets from the lock screen'),
+          trailing: AppSwitch(value: notifOn, onChanged: toggleNotif),
+        ),
       ],
     );
   }

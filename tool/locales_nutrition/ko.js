@@ -860,4 +860,13 @@ export default {
   "this isn’t a My Wellness plan file": "My Wellness 계획 파일이 아닙니다",
   "{0} min": "{0}분",
   "{0} routines saved": "루틴 {0}개가 저장되었습니다",
+
+  // — Workout quick-action notification —
+  "Log sets from the lock screen": "잠금 화면에서 세트 기록하기",
+  "A notification stays up during a workout, with buttons to log a set without unlocking your phone.": "운동 중에는 휴대폰을 잠금 해제하지 않고도 세트를 기록할 수 있는 버튼이 있는 알림이 표시됩니다.",
+  "All sets logged": "모든 세트 기록 완료",
+  "Open the app to finish the workout": "운동을 마치려면 앱을 여세요",
+  "Set {0}/{1}": "세트 {0}/{1}",
+  "Adjusting {0} · tap to switch to {1}": "{0} 조정 중 · 탭하여 {1}(으)로 전환",
+  "✓ Set": "✓ 세트",
 }

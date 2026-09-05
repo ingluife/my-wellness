@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../domain/format.dart';
 import '../domain/history.dart';
 import '../domain/i18n.dart';
+import '../platform/workout_notification.dart';
+import '../state/active_session.dart';
 import '../state/ai_provider.dart';
 import '../state/app_state_provider.dart';
 import '../state/ui_provider.dart';
@@ -30,6 +32,15 @@ final uiProvider = Provider<UiController>((ref) {
   return ui;
 });
 
+/// The active-session mutator, wired to the same two stores every widget already reads and
+/// writes through. Lives beside [uiProvider] because it needs both: [appStateProvider] for the
+/// mutation and [uiProvider] for the rest-timer and sound side effects `toggle` triggers.
+final activeSessionProvider = Provider<ActiveSession>((ref) => ActiveSession(
+      read: () => ref.read(appStateProvider),
+      update: ref.read(appStateProvider.notifier).update,
+      ui: ref.read(uiProvider),
+    ));
+
 /// The app.
 ///
 /// Theme and language are read straight out of the profile, so switching either repaints
@@ -52,7 +63,18 @@ class _MyWellnessAppState extends ConsumerState<MyWellnessApp> with WidgetsBindi
     I18n.instance.addListener(_onLanguageChanged);
     // Covers a cold start after the OS killed the app mid-picker: the first `resumed` callback
     // is not guaranteed to fire, but the first frame always does.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPhoto());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recoverLostPhoto();
+      _checkDeferredWorkoutSheets();
+    });
+
+    // Wires the quick-action notification to the one ActiveSession and UiController the rest of
+    // the app already reads and writes through, then draws it once for a session that was
+    // already running when the app (re)opened — the service does not survive the OS killing the
+    // app, the state does.
+    WorkoutNotification.instance
+        .bind(ref.read(activeSessionProvider), ref.read(uiProvider), () => ref.read(appStateProvider));
+    unawaited(WorkoutNotification.instance.sync(ref.read(appStateProvider)));
   }
 
   @override
@@ -77,6 +99,45 @@ class _MyWellnessAppState extends ConsumerState<MyWellnessApp> with WidgetsBindi
     if (state == AppLifecycleState.resumed) {
       ref.read(uiProvider).resync(soundOn: ref.read(appStateProvider).sound);
       _recoverLostPhoto();
+      _checkDeferredWorkoutSheets();
+    }
+  }
+
+  /// The id of the active workout the finish prompt was already offered for, so resuming with
+  /// nothing new to report does not put it back up. Kept here rather than on [ActiveWorkout]
+  /// because it means nothing once this run of the app ends — the next launch checks fresh.
+  String? _completeOfferedFor;
+
+  /// The quick-action notification can finish a set — even a whole exercise — with nobody
+  /// around to show the sheet that follows: `ActiveSession.toggle` reports `askTopWeight` and
+  /// `workoutDone` the same way it does for an in-app tap, but there is no `_SetRow` on screen
+  /// to act on them. This is where that catches up, on cold start and on every resume.
+  ///
+  /// Mirrors `_SetRow._toggle`'s own dispatch: the top-weight sheet first, since confirming it
+  /// chains into the finish prompt itself when it closes the last unit — see `_TopWeightState`.
+  void _checkDeferredWorkoutSheets() {
+    final s = ref.read(appStateProvider);
+    final a = s.active;
+    if (a == null) {
+      _completeOfferedFor = null;
+      return;
+    }
+
+    for (var i = 0; i < a.entries.length; i++) {
+      final e = a.entries[i];
+      if (e.sets.isEmpty || !e.sets.every((x) => x.done)) continue;
+      final loaded = modeOf(e.cfg) == 'reps' && !(isBw(e.cfg) && !e.sets.any((x) => (x.w ?? 0) > 0));
+      if (loaded && !e.asked) {
+        ref.read(appStateProvider.notifier).update((st) => st.active!.entries[i].asked = true);
+        topWeightSheet(ref, i);
+        return;
+      }
+    }
+
+    final allDone = a.entries.isNotEmpty && a.entries.every((e) => e.sets.every((x) => x.done));
+    if (allDone && _completeOfferedFor != a.id) {
+      _completeOfferedFor = a.id;
+      workoutCompleteSheet(ref);
     }
   }
 

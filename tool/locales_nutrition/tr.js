@@ -860,4 +860,13 @@ export default {
   "this isn’t a My Wellness plan file": "bu bir My Wellness plan dosyası değil",
   "{0} min": "{0} dk",
   "{0} routines saved": "{0} rutin kaydedildi",
+
+  // — Workout quick-action notification —
+  "Log sets from the lock screen": "Kilit ekranından set kaydet",
+  "A notification stays up during a workout, with buttons to log a set without unlocking your phone.": "Antrenman sırasında, telefonun kilidini açmadan set kaydetmek için düğmeler içeren bir bildirim görünür kalır.",
+  "All sets logged": "Tüm setler kaydedildi",
+  "Open the app to finish the workout": "Antrenmanı bitirmek için uygulamayı aç",
+  "Set {0}/{1}": "Set {0}/{1}",
+  "Adjusting {0} · tap to switch to {1}": "{0} ayarlanıyor · {1} değerine geçmek için dokun",
+  "✓ Set": "✓ Set",
 }

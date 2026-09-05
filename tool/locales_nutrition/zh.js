@@ -860,4 +860,13 @@ export default {
   "this isn’t a My Wellness plan file": "这不是 My Wellness 计划文件",
   "{0} min": "{0} 分钟",
   "{0} routines saved": "已保存 {0} 套课表",
+
+  // — Workout quick-action notification —
+  "Log sets from the lock screen": "从锁屏记录组数",
+  "A notification stays up during a workout, with buttons to log a set without unlocking your phone.": "训练期间会显示一条通知，通过按钮即可记录一组动作，无需解锁手机。",
+  "All sets logged": "所有组数已记录",
+  "Open the app to finish the workout": "打开应用以结束训练",
+  "Set {0}/{1}": "第 {0}/{1} 组",
+  "Adjusting {0} · tap to switch to {1}": "正在调整{0}·点击切换到{1}",
+  "✓ Set": "✓ 完成",
 }

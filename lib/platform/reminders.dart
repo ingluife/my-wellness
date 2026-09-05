@@ -4,6 +4,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../data/models/app_state.dart';
 import '../domain/i18n.dart';
+import 'notification_permission.dart';
 
 /// The workout-day reminder.
 ///
@@ -17,6 +18,11 @@ class Reminders {
 
   final _plugin = FlutterLocalNotificationsPlugin();
   bool _ready = false;
+
+  /// The underlying plugin, for anything else that needs to share its notification permission —
+  /// see [ensureNotificationPermission] and the workout quick-action notification's Settings
+  /// toggle.
+  FlutterLocalNotificationsPlugin get plugin => _plugin;
 
   /// Ids 100..106 — one per weekday, in `getDay()` numbering, so a resync can cancel exactly
   /// what it is about to replace without touching anything else.
@@ -91,22 +97,8 @@ class Reminders {
     }
   }
 
-  Future<bool> _ensurePermission(bool interactive) async {
-    final android =
-        _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    if (android != null) {
-      final enabled = await android.areNotificationsEnabled() ?? false;
-      if (enabled) return true;
-      if (!interactive) return false;
-      return await android.requestNotificationsPermission() ?? false;
-    }
-    final ios =
-        _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-    if (ios != null && interactive) {
-      return await ios.requestPermissions(alert: true, badge: true, sound: true) ?? false;
-    }
-    return !interactive;
-  }
+  Future<bool> _ensurePermission(bool interactive) =>
+      ensureNotificationPermission(_plugin, interactive: interactive);
 
   /// The next occurrence of a weekday at a time of day.
   ///

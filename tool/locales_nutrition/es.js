@@ -860,4 +860,13 @@ export default {
   "this isn’t a My Wellness plan file": "esto no es un archivo de plan de My Wellness",
   "{0} min": "{0} min",
   "{0} routines saved": "{0} rutinas guardadas",
+
+  // — Workout quick-action notification —
+  "Log sets from the lock screen": "Registrar series desde la pantalla de bloqueo",
+  "A notification stays up during a workout, with buttons to log a set without unlocking your phone.": "Durante un entrenamiento se muestra una notificación con botones para registrar una serie sin desbloquear el teléfono.",
+  "All sets logged": "Todas las series registradas",
+  "Open the app to finish the workout": "Abre la app para terminar el entrenamiento",
+  "Set {0}/{1}": "Serie {0}/{1}",
+  "Adjusting {0} · tap to switch to {1}": "Ajustando {0} · toca para cambiar a {1}",
+  "✓ Set": "✓ Serie",
 }
